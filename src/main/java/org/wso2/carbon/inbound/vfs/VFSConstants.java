@@ -207,4 +207,5 @@ public class VFSConstants {
 
     // The waiting time of the file before picking it up (in milliseconds)
     public static final String WAIT_TIME_BEFORE_READ = "transport.vfs.waitTimeBeforeRead";
+
 }

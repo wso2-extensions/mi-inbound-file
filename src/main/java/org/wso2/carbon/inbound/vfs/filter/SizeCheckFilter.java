@@ -1,12 +1,173 @@
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.apache.commons.vfs2.FileObject;
 
-public class SizeCheckFilter implements Filter{
+import org.apache.commons.vfs2.FileObject;
+import org.wso2.carbon.inbound.vfs.VFSConfig;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.carbon.inbound.vfs.VFSUtils;
+
+import java.io.InputStream;
+import java.nio.file.FileSystemException;
+import java.security.MessageDigest;
+
+public class SizeCheckFilter implements Filter {
+    Log log = LogFactory.getLog(SizeCheckFilter.class.getName());
+    VFSConfig vfsConfig;
+    FileSystemManager fsManager;
+    public static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
+    public SizeCheckFilter(VFSConfig vfsConfig, FileSystemManager fsManager) {
+        this.vfsConfig = vfsConfig;
+        this.fsManager = fsManager;
+    }
 
     @Override
     public boolean accept(FileObject fileObject) {
+        try {
+            return isFileStillUploading(fileObject);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
+
+    private boolean isFileStillUploading(FileObject child) {
+        if(vfsConfig.getCheckSizeIgnoreEmpty().isEmpty() && vfsConfig.getCheckSizeInterval().isEmpty()) {
+            //CheckEmpty and CheckSize are not active - return false (file is not uploading)
+            return false;
+        }
+        InputStream inputStream = null;
+        try {
+            //get first MD5
+            log.debug("Create MD5 Checksum of File: "+ VFSUtils.maskURLPassword(child.getName().toString()));
+            inputStream = child.getContent().getInputStream();
+            String md5 = getMD5Checksum(inputStream);
+            return isFileEmpty(md5) || isFileStillChangingSize(child, md5);
+        } catch (Exception e) {
+            try {
+                if (ExceptionUtils.getStackTrace(e).contains("The file is being used by another process")) {
+                    return true;
+                }
+            } catch (Exception e2) {
+            }
+            //return true when any exception occurs
+            return true;
+        } finally {
+            if(inputStream != null){
+                try {
+                    inputStream.close();
+                } catch (Exception ex) {
+                }
+            }
+        }
+    }
+
+
+
+
+    /**
+     * This Function calculates the MD5 Hash of the FileObject, waits
+     * checkSizeInterval [ms] time, and calculates the MD5 Hash again. If they
+     * are the same, the file is finished uploading and can be consumed.
+     *
+     * @param child the fileobject currently read
+     * @return if file is empty or the filesize is changing
+     */
+    private boolean isFileStillChangingSize(FileObject child, String md5) {
+        //check if the lock mechanism is activated
+        if (vfsConfig.getCheckSizeInterval().isEmpty()) {
+            //not checking the file size changing
+            return false;
+        }
+        try {
+            //get interval time
+            String checkSizeIntervalString = vfsConfig.getCheckSizeInterval();
+            Long checkSizeInterval = Long.valueOf(checkSizeIntervalString);
+
+            //wait interval time
+            log.debug("Check if file is still uploading. Now sleep "+checkSizeInterval+" ms");
+            Thread.sleep(checkSizeInterval);
+            //get second MD5
+            //clear cache and refresh
+            fsManager.getFilesCache().close();
+            child.refresh();
+            String md5AfterSleep = getMD5Checksum(child);
+            if (!md5.equals(md5AfterSleep)) {
+                //file is still uploading
+                log.debug("File ist still uploading. md5 Hashcode Before="+md5 + " After="+md5AfterSleep);
+                return true;
+            }
+        } catch (Exception e) {
+            try {
+                if (ExceptionUtils.getStackTrace(e).contains("The file is being used by another process")) {
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+            return true;
+        }
         return false;
     }
+
+    private String getMD5Checksum(FileObject child) {
+        try (InputStream inputStream = child.getContent().getInputStream()) {
+            //get first MD5
+            return getMD5Checksum(inputStream);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Return the MD5Checksum of a InputStream as String
+     *
+     * @param fis inputStream of the current file
+     * @return MD5 Checksum
+     * @throws Exception
+     */
+    private String getMD5Checksum(InputStream fis) throws Exception {
+        byte[] b = createChecksum(fis);
+        String result = "";
+        for (int i = 0; i < b.length; i++) {
+            result += Integer.toString((b[i] & 0xff) + 0x100, 16).substring(1);
+        }
+        return result;
+    }
+
+    /**
+     * Used by getMD5Checksum to get the MD5 as byte array
+     *
+     * @param fis inputStream of the current file
+     * @return MD5 Checksum
+     * @throws Exception
+     */
+    private byte[] createChecksum(InputStream fis) throws Exception {
+        byte[] buffer = new byte[1024];
+        MessageDigest complete = MessageDigest.getInstance("MD5");
+        int numRead;
+        do {
+            numRead = fis.read(buffer);
+            if (numRead > 0) {
+                complete.update(buffer, 0, numRead);
+            }
+        } while (numRead != -1);
+        fis.close();
+        return complete.digest();
+    }
+
+    /**
+     * Verifies if the given md5 is the md5 of an Empty File
+     *
+     * @param md5 of the given file
+     * @return true if configuration is set and file is empty
+     */
+    private boolean isFileEmpty(String md5) {
+        if (vfsConfig.getCheckSizeIgnoreEmpty().isEmpty()) {
+            return EMPTY_MD5.equals(md5);
+        }
+        return false;
+    }
+
 }

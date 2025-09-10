@@ -17,14 +17,14 @@
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
-        <carbon.mediation.version>4.4.10</carbon.mediation.version>
+        <carbon.mediation.version>4.5.0-SNAPSHOT</carbon.mediation.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
         <dependency>
-            <groupId>org.wso2.carbon.mediation</groupId>
-            <artifactId>org.wso2.carbon.inbound.endpoint</artifactId>
+            <groupId>org.wso2.ei</groupId>
+            <artifactId>org.wso2.micro.integrator.inbound.endpoint</artifactId>
             <version>${carbon.mediation.version}</version>
         </dependency>
 
@@ -128,6 +128,14 @@
                 <enabled>true</enabled>
                 <updatePolicy>daily</updatePolicy>
                 <checksumPolicy>ignore</checksumPolicy>
+            </releases>
+        </repository>
+        <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2</url>
+            <releases>
+                <enabled>true</enabled>
             </releases>
         </repository>
     </repositories>

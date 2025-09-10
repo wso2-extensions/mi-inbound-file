@@ -60,17 +60,6 @@
               "hidden": "true",
               "required": "false"
             }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "protocol",
-              "displayName": "Protocol",
-              "inputType": "string",
-              "defaultValue": "file",
-              "hidden": "true",
-              "required": "true"
-            }
           }
         ]
       }
@@ -96,6 +85,16 @@
             "value": {
               "name": "interval",
               "displayName": "Polling Interval",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cronExpression",
+              "displayName": "Cron-Expression",
               "inputType": "string",
               "defaultValue": "",
               "required": "true"

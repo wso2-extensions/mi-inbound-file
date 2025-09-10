@@ -1,5 +1,6 @@
 package org.wso2.carbon.inbound.vfs;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.vfs2.FileContent;
@@ -7,166 +8,310 @@ import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.FileSystemOptions;
+import org.apache.commons.vfs2.FileType;
 import org.apache.commons.vfs2.impl.StandardFileSystemManager;
-import org.apache.synapse.MessageContext;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import org.wso2.carbon.inbound.vfs.filter.FileSelector;
+import org.wso2.carbon.inbound.vfs.processor.Action;
+import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 import org.wso2.carbon.inbound.vfs.processor.PostProcessingHandler;
 import org.wso2.carbon.inbound.vfs.processor.PreProcessingHandler;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 
 public class VFSConsumer extends GenericPollingConsumer {
 
-    private final Log log = LogFactory.getLog(VFSConsumer.class.getName());
-    private Properties vfsProperties;
-    private FileSystemManager fsManager;
-    private FileSystemOptions fsOptions;
+    private static final Log log = LogFactory.getLog(VFSConsumer.class);
+    private boolean fileLock = true;
     private final VFSConfig vfsConfig;
-    private String name;
-    private boolean isFileSystemClosed = false;
-    private PreProcessingHandler preProcessingHandler;
-    private FileInjectHandler fileInjectHandler;
-    private PostProcessingHandler postProcessingHandler;
-    private FileSelector fileSelector;
+    private final FileSystemManager fsManager;
+    private FileSystemOptions fso;
 
-    public VFSConsumer(Properties properties, String name,
-                       SynapseEnvironment synapseEnvironment, long scanInterval,
-                       String injectingSeq, String onErrorSeq, boolean coordination, boolean sequential) {
+    private final FileSelector fileSelector;
+    private final PreProcessingHandler preProcessingHandler;
+    private final PostProcessingHandler postProcessingHandler;
+    private final FileInjectHandler fileInjectHandler;
 
+    private boolean readSubDirectories = false;
+    private final String name;
+
+    public VFSConsumer(Properties properties,
+                       String name,
+                       SynapseEnvironment synapseEnvironment,
+                       long scanInterval,
+                       String injectingSeq,
+                       String onErrorSeq,
+                       boolean coordination,
+                       boolean sequential) {
         super(properties, name, synapseEnvironment, scanInterval, injectingSeq, onErrorSeq, coordination, sequential);
-        this.name = name;
-        vfsConfig = new VFSConfig(properties);
-        fsManager = new StandardFileSystemManager();
-        ((StandardFileSystemManager) fsManager).setConfiguration(getClass().getClassLoader().getResource("providers.xml"));
+
+        this.vfsConfig = new VFSConfig(properties);
+
         try {
-            ((StandardFileSystemManager) fsManager).init();
+            StandardFileSystemManager mgr = new StandardFileSystemManager();
+            mgr.setConfiguration(getClass().getClassLoader().getResource("providers.xml"));
+            mgr.init();
+            this.fsManager = mgr;
         } catch (FileSystemException e) {
             throw new RuntimeException("Error initializing VFS FileSystemManager", e);
         }
-        fsOptions = new FileSystemOptions(); // TODO: load from properties
-        fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, properties);
-        preProcessingHandler = new PreProcessingHandler(); // TODO: setup this
-        postProcessingHandler = new PostProcessingHandler(); // TODO: setup this
-        postProcessingHandler.setOnSuccessAction(new MoveAction());
-        fileSelector = new FileSelector(); // TODO: setup this
+
+        // Build FSO once per poll (protocol options; auth; SFTP opts; etc.)
+        this.fso = null;
+
+        // Handlers (wire your concrete actions here)
+        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, properties);
+        this.preProcessingHandler = new PreProcessingHandler();
+        this.postProcessingHandler = new PostProcessingHandler();
+        int actionAfterProcess = vfsConfig.getActionAfterProcess();
+        this.postProcessingHandler.setOnSuccessAction(VFSUtils.getActionAfterProcess(vfsConfig, actionAfterProcess));
+        this.postProcessingHandler.setOnFailAction(VFSUtils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure()));
+        this.postProcessingHandler.setOnFailActionFailAction(new MoveAction(vfsConfig.getMoveAfterFailure()));
+        this.postProcessingHandler.setOnSuccessActionFailAction(new MoveAction(vfsConfig.getMoveAfterMoveFailure()));
+
+        this.fileSelector = new FileSelector(vfsConfig, fsManager);
+        this.name = name;
+    }
+
+    public VFSConsumer(Properties properties,
+                       String name,
+                       SynapseEnvironment synapseEnvironment,
+                       String cronExpression,
+                       String injectingSeq,
+                       String onErrorSeq,
+                       boolean coordination,
+                       boolean sequential) {
+        super(properties, name, synapseEnvironment, cronExpression, injectingSeq, onErrorSeq, coordination, sequential);
+
+        this.vfsConfig = new VFSConfig(properties);
+
+        try {
+            StandardFileSystemManager mgr = new StandardFileSystemManager();
+            mgr.setConfiguration(getClass().getClassLoader().getResource("providers.xml"));
+            mgr.init();
+            this.fsManager = mgr;
+        } catch (FileSystemException e) {
+            throw new RuntimeException("Error initializing VFS FileSystemManager", e);
+        }
+
+        this.fso = null;
+
+        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, properties);
+        this.preProcessingHandler = new PreProcessingHandler();
+        this.postProcessingHandler = new PostProcessingHandler();
+        int actionAfterProcess = vfsConfig.getActionAfterProcess();
+        this.postProcessingHandler.setOnSuccessAction(VFSUtils.getActionAfterProcess(vfsConfig, actionAfterProcess));
+        this.postProcessingHandler.setOnFailAction(VFSUtils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure()));
+        this.postProcessingHandler.setOnFailActionFailAction(new MoveAction(vfsConfig.getMoveAfterFailure()));
+        this.postProcessingHandler.setOnSuccessActionFailAction(new MoveAction(vfsConfig.getMoveAfterMoveFailure()));
+
+        this.fileSelector = new FileSelector(vfsConfig, fsManager);
+        this.name = name;
     }
 
     @Override
     public Object poll() {
-
-
-        if (log.isDebugEnabled()) {
-            log.debug("Polling: " + VFSUtils.maskURLPassword(vfsConfig.getFileURI()));
-        }
-
-        if (vfsConfig.isClusterAware()) {
-            if (log.isDebugEnabled()) {
-                log.debug("Cluster aware flag is enabled.");
-            }
-        }
-
-        FileSystemOptions fso = null;
-        setFileSystemClosed(false);
-
-        try {
-            fso = VFSUtils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
-        } catch (FileSystemException e) {
-            throw new RuntimeException(e);
-        }
-
-        FileObject fileObject = null;
-
-        String fileURI = vfsConfig.getFileURI();
-        if(fileURI.contains("vfs:")){
-            fileURI = fileURI.substring(fileURI.indexOf("vfs:") + 4);
-        }
-
-        FileReader fileReader = new FileReader(fileURI, fsManager, fso);
-        fileObject = fileReader.readDirectoryWithRetry();
-        if (fileObject == null) {
-            log.error("FileObject is null for URI: " + VFSUtils.maskURLPassword(fileURI));
+        // Resolve input URI and subdirectory setting from config (supports /* or \*)
+        ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
+        if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
+            log.error("Invalid FileURI. Check configuration. URI: " + VFSUtils.maskURLPassword(vfsConfig.getFileURI()));
             return null;
         }
-        try {
-            if (fileObject.isFile()) {
-                processFile(fileObject);
-            } else if (fileObject.isFolder()) {
-                processDirectory(fileObject);
-            }
-        } catch (FileSystemException e) {
-            throw new RuntimeException(e);
-        }
+        readSubDirectories = inFileUri.supportSubDirectories;
+        String fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
 
         if (log.isDebugEnabled()) {
-            log.debug("Scanning directory or file : " + VFSUtils.maskURLPassword(fileURI));
+            log.debug("Polling VFS location: " + VFSUtils.maskURLPassword(fileURI) +
+                    " (recursive=" + readSubDirectories + ")");
+        }
+
+        try {
+            // Attach per-scheme options (SFTP, FTP, SMB, etc.)
+            fso = VFSUtils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
+        } catch (Exception e) {
+            log.warn("Unable to attach scheme options for: " + VFSUtils.maskURLPassword(fileURI), e);
+            fso = null; // continue; many schemes work without explicit options
+        }
+
+        FileObject root;
+        try {
+            root = fsManager.resolveFile(fileURI, fso);
+        } catch (FileSystemException e) {
+            log.error("Failed to resolve FileURI: " + VFSUtils.maskURLPassword(fileURI), e);
+            return null;
+        }
+
+        if (root == null) {
+            log.error("Resolved FileObject is null for: " + VFSUtils.maskURLPassword(fileURI));
+            return null;
+        }
+
+        try {
+            if (!root.exists() || !root.isReadable()) {
+                log.warn("File/Directory not accessible: " + VFSUtils.maskURLPassword(fileURI));
+                return null;
+            }
+
+            if (root.getType() == FileType.FILE) {
+                // Single-file mode
+                processFile(root);
+            } else if (root.getType() == FileType.FOLDER) {
+                // Directory mode (optional recursion)
+                processDirectory(root);
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("Ignoring non-file, non-folder: " + VFSUtils.maskURLPassword(root.toString()));
+                }
+            }
+        } catch (FileSystemException e) {
+            log.error("Error during poll for: " + VFSUtils.maskURLPassword(fileURI), e);
+        } finally {
+            safeClose(root);
         }
 
         return null;
     }
 
-    private void processDirectory(FileObject fileObject) {
+    /* =========================
+       Directory & File Handling
+       ========================= */
 
+    private void processDirectory(FileObject dir) throws FileSystemException {
+        FileObject[] children = null;
+        try {
+            children = dir.getChildren();
+        } catch (FileSystemException e) {
+            log.error("Unable to list children of: " + VFSUtils.maskURLPassword(dir.toString()), e);
+        }
+
+        if (children == null || children.length == 0) {
+            if (log.isDebugEnabled()) {
+                log.debug("Empty directory: " + VFSUtils.maskURLPassword(dir.toString()));
+            }
+            return;
+        }
+        // 1. sort to ensure files are processed in order
+        String fileSortParam = vfsConfig.getFileSortParam();
+        if (StringUtils.isNotEmpty(fileSortParam)) {
+            VFSUtils.sortFileObjects(children, fileSortParam, vfsConfig);
+        }
+        for (FileObject child : children) {
+            try {
+                // Skip lock/fail markers
+                String base = child.getName().getBaseName();
+                if (base.endsWith(".lock") || base.endsWith(".fail")) {
+                    continue;
+                }
+
+                if (child.getType() == FileType.FOLDER) {
+                    if (readSubDirectories) {
+                        // Recurse only if enabled
+                        processDirectory(child);
+                    } else if (log.isDebugEnabled()) {
+                        log.debug("Skipping subdirectory (recursive disabled): " +
+                                VFSUtils.maskURLPassword(child.toString()));
+                    }
+                } else if (child.getType() == FileType.FILE) {
+                    processFile(child);
+                } else if (log.isDebugEnabled()) {
+                    log.debug("Ignoring item (not file/folder): " +
+                            VFSUtils.maskURLPassword(child.toString()));
+                }
+            } catch (Exception e) {
+                // never block remaining files on a single failure
+                log.error("Error processing child: " + VFSUtils.maskURLPassword(child.toString()), e);
+            } finally {
+                safeClose(child);
+            }
+        }
     }
 
-    private void processFile(FileObject fileObject) throws FileSystemException {
-        if (canProcessFile(fileObject)) {
-            preProcessingHandler.handle(fileObject);
+    private void processFile(FileObject file) throws FileSystemException {
+        // Delegate readiness, age, size, pattern, etc. to FileSelector
+        if (!fileSelector.isValidFile(file)) {
+            if (log.isDebugEnabled()) {
+                log.debug("File not eligible: " + VFSUtils.maskURLPassword(file.toString()));
+            }
+            return;
+        }
 
-            FileContent content = fileObject.getContent();
-            String fileName = fileObject.getName().getBaseName();
-            String filePath = fileObject.getName().getPath();
-            String fileURI = fileObject.getName().getURI();
+        // Pre-processing hook (e.g., acquire lock, tmp rename, etc.)
+        preProcessingHandler.handle(file);
 
-            Map<String, Object> transportHeaders = new HashMap<>();
-            transportHeaders.put(VFSConstants.FILE_NAME, fileName);
-            transportHeaders.put(VFSConstants.FILE_PATH, filePath);
-            transportHeaders.put(VFSConstants.FILE_URI, fileURI);
+        // Build transport headers
+        try (FileContent content = file.getContent()) {
+            String fileName = file.getName().getBaseName();
+            String filePath = file.getName().getPath();
+            String fileURI = file.getName().getURI();
+
+            Map<String, Object> headers = new HashMap<>();
+            headers.put(VFSConstants.FILE_NAME, fileName);
+            headers.put(VFSConstants.FILE_PATH, filePath);
+            headers.put(VFSConstants.FILE_URI, fileURI);
 
             try {
-                transportHeaders.put(org.apache.synapse.commons.vfs.VFSConstants.FILE_LENGTH, content.getSize());
-                transportHeaders.put(
-                        org.apache.synapse.commons.vfs.VFSConstants.LAST_MODIFIED, content.getLastModifiedTime());
+                headers.put(org.apache.synapse.commons.vfs.VFSConstants.FILE_LENGTH, content.getSize());
+                headers.put(org.apache.synapse.commons.vfs.VFSConstants.LAST_MODIFIED, content.getLastModifiedTime());
             } catch (FileSystemException ignore) {
-//                closeFileSystem(file);
+                // length/mtime are best-effort
             }
-            fileInjectHandler.setTransportHeaders(transportHeaders);
+
+            fileInjectHandler.setTransportHeaders(headers);
             fileInjectHandler.setFileURI(fileURI);
-            boolean status = fileInjectHandler.invoke(fileObject, name);
-            if (status) {
-                postProcessingHandler.onSuccess(fileObject);
+
+            boolean ok = fileInjectHandler.invoke(file, name);
+            if (ok) {
+                postProcessingHandler.onSuccess(file);
             } else {
-                postProcessingHandler.onFail(fileObject);
+                postProcessingHandler.onFail(file);
             }
         }
     }
 
-    private boolean canProcessFile(FileObject fileObject) {
+    /* =========================
+                Helpers
+       ========================= */
 
-        // check if the file is still uploading or being processed by another thread , check size limit, age
-        return fileSelector.isValidFile(fileObject);
+    private String stripVfsSchemeIfPresent(String uri) {
+        return uri != null && uri.startsWith("vfs:") ? uri.substring(4) : uri;
     }
 
-    public void setFileSystemClosed(boolean fileSystemClosed) {
-
-        isFileSystemClosed = fileSystemClosed;
-    }
-
-    private void closeFileSystem(FileObject fileObject) {
-        try {
-            //Close the File system if it is not already closed by the finally block of processFile method
-            if (fileObject != null && fsManager != null && fileObject.getParent() != null  && fileObject.getParent().getFileSystem() != null) {
-                fsManager.closeFileSystem(fileObject.getParent().getFileSystem());
-                fileObject.close();
-                setFileSystemClosed(true);
-            }
-        } catch (FileSystemException warn) {
-            //  log.warn("Cannot close file after processing : " + file.getName().getPath(), warn);
-            // ignore the warning, since we handed over the stream close job to AutocloseInputstream..
+    private void safeClose(FileObject fo) {
+        if (fo != null) {
+            try { fo.close(); } catch (Exception ignore) {}
         }
+    }
+
+    private static class ResolvedFileUri {
+        final String resolvedUri;
+        final boolean supportSubDirectories;
+        ResolvedFileUri(String uri, boolean subDirs) {
+            this.resolvedUri = uri; this.supportSubDirectories = subDirs;
+        }
+    }
+
+    private ResolvedFileUri extractFileUri(String propertyForUri) {
+        String definedFileUri;
+        switch (propertyForUri) {
+            case VFSConstants.TRANSPORT_FILE_FILE_URI:
+                definedFileUri = vfsConfig.getFileURI();
+                break;
+            default:
+                definedFileUri = null;
+        }
+        if (StringUtils.isNotEmpty(definedFileUri)) {
+            if (VFSUtils.supportsSubDirectoryToken(definedFileUri)) {
+                return new ResolvedFileUri(VFSUtils.sanitizeFileUriWithSub(definedFileUri), true);
+            } else {
+                return new ResolvedFileUri(definedFileUri, false);
+            }
+        }
+        return null;
     }
 }
+

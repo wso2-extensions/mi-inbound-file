@@ -151,10 +151,141 @@ public class VFSConfig {
 
 
     public VFSConfig(Properties properties) {
-
-        // TODO: set the properties
+        // Basic URIs
         this.fileURI = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_URI);
+        this.replyFileURI = properties.getProperty(VFSConstants.REPLY_FILE_URI);
+        this.fileNamePattern = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_NAME_PATTERN);
+        this.contentType = properties.getProperty(VFSConstants.TRANSPORT_FILE_CONTENT_TYPE);
+
+        // Boolean/string flags
+        this.updateLastModified = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.UPDATE_LAST_MODIFIED, "false"));
+        this.streaming = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.STREAMING, "false"));
+        this.fileLocking = VFSConstants.TRANSPORT_FILE_LOCKING_ENABLED.equalsIgnoreCase(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_LOCKING, VFSConstants.TRANSPORT_FILE_LOCKING_DISABLED));
+        this.forceCreateFolder = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.FORCE_CREATE_FOLDER, "false"));
+        this.resolveHostsDynamically = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_RESOLVEHOST_DYNAMICALLY, "false"));
+        this.autoLockRelease = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.TRANSPORT_AUTO_LOCK_RELEASE, "false"));
+        this.autoLockReleaseSameNode = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.TRANSPORT_AUTO_LOCK_RELEASE_SAME_NODE, "false"));
+        this.distributedLock = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.TRANSPORT_DISTRIBUTED_LOCK, "false"));
+        this.clusterAware = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.CLUSTER_AWARE, "false"));
+
+        // Actions after processing
+        this.actionAfterProcess = parseAction(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_ACTION_AFTER_PROCESS));
+        this.actionAfterErrors = parseAction(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_ACTION_AFTER_ERRORS));
+        this.actionAfterFailure = parseAction(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_ACTION_AFTER_FAILURE));
+
+        // Move locations
+        this.moveAfterProcess = properties.getProperty(VFSConstants.TRANSPORT_FILE_MOVE_AFTER_PROCESS);
+        this.moveAfterErrors = properties.getProperty(VFSConstants.TRANSPORT_FILE_MOVE_AFTER_ERRORS);
+        this.moveAfterFailure = properties.getProperty(VFSConstants.TRANSPORT_FILE_MOVE_AFTER_FAILURE);
+        this.moveAfterMoveFailure = properties.getProperty(VFSConstants.TRANSPORT_FILE_MOVE_AFTER_FAILED_MOVE);
+
+        // Timestamp formatting
+        String tsFormat = properties.getProperty(VFSConstants.TRANSPORT_FILE_MOVE_TIMESTAMP_FORMAT);
+        if (tsFormat != null) {
+            this.moveTimestampFormat = new SimpleDateFormat(tsFormat);
+        }
+        this.failedRecordTimestampFormat =
+                properties.getProperty(VFSConstants.TRANSPORT_FAILED_RECORD_TIMESTAMP_FORMAT,
+                        VFSConstants.DEFAULT_TRANSPORT_FAILED_RECORD_TIMESTAMP_FORMAT);
+
+        // Check size mechanism
+        this.checkSizeInterval = properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_INTERVAL);
+        this.checkSizeIgnoreEmpty = properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_IGNORE_EMPTY, "false");
+
+        // Retry / reconnect
+        this.maxRetryCount = Integer.parseInt(
+                properties.getProperty(VFSConstants.MAX_RETRY_COUNT,
+                        String.valueOf(VFSConstants.DEFAULT_MAX_RETRY_COUNT)));
+        this.reconnectTimeout = Long.parseLong(
+                properties.getProperty(VFSConstants.RECONNECT_TIMEOUT,
+                        String.valueOf(VFSConstants.DEFAULT_RECONNECT_TIMEOUT)));
+        this.nextRetryDurationForFailedMove = Integer.parseInt(
+                properties.getProperty(VFSConstants.TRANSPORT_FAILED_RECORD_NEXT_RETRY_DURATION,
+                        String.valueOf(VFSConstants.DEFAULT_NEXT_RETRY_DURATION)));
+
+        // Failed record handling
+        this.failedRecordFileName = properties.getProperty(
+                VFSConstants.TRANSPORT_FAILED_RECORDS_FILE_NAME,
+                VFSConstants.DEFAULT_FAILED_RECORDS_FILE_NAME);
+        this.failedRecordFileDestination = properties.getProperty(
+                VFSConstants.TRANSPORT_FAILED_RECORDS_FILE_DESTINATION,
+                VFSConstants.DEFAULT_FAILED_RECORDS_FILE_DESTINATION);
+
+        // Processing interval/count
+        String intervalStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_INTERVAL);
+        if (intervalStr != null) {
+            this.fileProcessingInterval = Integer.valueOf(intervalStr);
+        }
+        String countStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_COUNT);
+        if (countStr != null) {
+            this.fileProcessingCount = Integer.valueOf(countStr);
+        }
+
+        // Lock release configs
+        String autoReleaseIntervalStr = properties.getProperty(VFSConstants.TRANSPORT_AUTO_LOCK_RELEASE_INTERVAL);
+        if (autoReleaseIntervalStr != null) {
+            this.autoLockReleaseInterval = Long.valueOf(autoReleaseIntervalStr);
+        }
+
+        String distLockTimeoutStr = properties.getProperty(VFSConstants.TRANSPORT_DISTRIBUTED_LOCK_TIMEOUT);
+        if (distLockTimeoutStr != null) {
+            this.distributedLockTimeout = Long.valueOf(distLockTimeoutStr);
+        }
+
+        // Sorting configs
+        this.fileSortParam = properties.getProperty(VFSConstants.FILE_SORT_PARAM);
+        this.fileSortAscending = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.FILE_SORT_ORDER, "true"));
+
+        // File size limit
+        this.fileSizeLimit = Double.parseDouble(
+                properties.getProperty(VFSConstants.TRANSPORT_FILE_SIZE_LIMIT,
+                        String.valueOf(VFSConstants.DEFAULT_TRANSPORT_FILE_SIZE_LIMIT)));
+
+        // Subfolder timestamp
+        this.subfolderTimestamp = properties.getProperty(VFSConstants.SUBFOLDER_TIMESTAMP);
+
+        // Min/Max Age
+        String minAgeStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_MINIMUM_AGE);
+        if (minAgeStr != null) {
+            this.minimumAge = Long.valueOf(minAgeStr);
+        }
+        String maxAgeStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_MAXIMUM_AGE);
+        if (maxAgeStr != null) {
+            this.maximumAge = Long.valueOf(maxAgeStr);
+        }
+
+        // Secure vault related
+        this.secureVaultProperties = properties;
     }
+
+    /**
+     * Small helper to map actions to int (DELETE / MOVE etc.)
+     */
+    private int parseAction(String action) {
+        if (action == null) {
+            return DELETE; // default
+        }
+        if ("MOVE".equalsIgnoreCase(action)) {
+            return MOVE;
+        } else if ("NONE".equalsIgnoreCase(action)) {
+            return NONE;
+        }
+        return DELETE;
+    }
+
 
     public String getFileURI() {
         if (resolveHostsDynamically) {
@@ -240,5 +371,173 @@ public class VFSConfig {
             }
         }
         return parameter;
+    }
+
+    public String getReplyFileURI() {
+        return replyFileURI;
+    }
+
+    public String getFileNamePattern() {
+        return fileNamePattern;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public boolean isUpdateLastModified() {
+        return updateLastModified;
+    }
+
+    public int getActionAfterProcess() {
+        return actionAfterProcess;
+    }
+
+    public int getActionAfterErrors() {
+        return actionAfterErrors;
+    }
+
+    public int getActionAfterFailure() {
+        return actionAfterFailure;
+    }
+
+    public String getMoveAfterProcess() {
+        return moveAfterProcess;
+    }
+
+    public String getMoveAfterErrors() {
+        return moveAfterErrors;
+    }
+
+    public String getMoveAfterFailure() {
+        return moveAfterFailure;
+    }
+
+    public DateFormat getMoveTimestampFormat() {
+        return moveTimestampFormat;
+    }
+
+    public String getCheckSizeInterval() {
+        return checkSizeInterval;
+    }
+
+    public String getCheckSizeIgnoreEmpty() {
+        return checkSizeIgnoreEmpty;
+    }
+
+    public boolean isStreaming() {
+        return streaming;
+    }
+
+    public int getMaxRetryCount() {
+        return maxRetryCount;
+    }
+
+    public long getReconnectTimeout() {
+        return reconnectTimeout;
+    }
+
+    public boolean isFileLocking() {
+        return fileLocking;
+    }
+
+    public CryptoUtil getCryptoUtil() {
+        return cryptoUtil;
+    }
+
+    public Properties getSecureVaultProperties() {
+        return secureVaultProperties;
+    }
+
+    public double getFileSizeLimit() {
+        return fileSizeLimit;
+    }
+
+    public String getMoveAfterMoveFailure() {
+        return moveAfterMoveFailure;
+    }
+
+    public int getNextRetryDurationForFailedMove() {
+        return nextRetryDurationForFailedMove;
+    }
+
+    public String getFailedRecordFileName() {
+        return failedRecordFileName;
+    }
+
+    public String getFailedRecordFileDestination() {
+        return failedRecordFileDestination;
+    }
+
+    public String getFailedRecordTimestampFormat() {
+        return failedRecordTimestampFormat;
+    }
+
+    public Integer getFileProcessingInterval() {
+        return fileProcessingInterval;
+    }
+
+    public Integer getFileProcessingCount() {
+        return fileProcessingCount;
+    }
+
+    public boolean isAutoLockRelease() {
+        return autoLockRelease;
+    }
+
+    public Long getAutoLockReleaseInterval() {
+        return autoLockReleaseInterval;
+    }
+
+    public Boolean getAutoLockReleaseSameNode() {
+        return autoLockReleaseSameNode;
+    }
+
+    public boolean isDistributedLock() {
+        return distributedLock;
+    }
+
+    public String getFileSortParam() {
+        return fileSortParam;
+    }
+
+    public boolean isFileSortAscending() {
+        return fileSortAscending;
+    }
+
+    public boolean isForceCreateFolder() {
+        return forceCreateFolder;
+    }
+
+    public String getSubfolderTimestamp() {
+        return subfolderTimestamp;
+    }
+
+    public Long getDistributedLockTimeout() {
+        return distributedLockTimeout;
+    }
+
+    public boolean isCanceled() {
+        return canceled;
+    }
+
+    public boolean isResolveHostsDynamically() {
+        return resolveHostsDynamically;
+    }
+
+    public boolean isFileNotFoundLogged() {
+        return fileNotFoundLogged;
+    }
+
+    public ParameterInclude getParams() {
+        return params;
+    }
+
+    public Long getMinimumAge() {
+        return minimumAge;
+    }
+
+    public Long getMaximumAge() {
+        return maximumAge;
     }
 }

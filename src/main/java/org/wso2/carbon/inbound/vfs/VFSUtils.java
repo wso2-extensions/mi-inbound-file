@@ -1,5 +1,8 @@
 package org.wso2.carbon.inbound.vfs;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.FileSystemOptions;
@@ -9,15 +12,23 @@ import org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
 import org.apache.commons.vfs2.provider.ftps.FtpsMode;
 import org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 import org.apache.synapse.commons.vfs.VFSConstants;
+import org.wso2.carbon.inbound.vfs.processor.Action;
+import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
+import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class VFSUtils {
+
+    private static final Log log = LogFactory.getLog(VFSUtils.class);
 
     private static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z0-9]+://.*");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(":(?:[^/]+)@");
@@ -342,5 +353,124 @@ public class VFSUtils {
         }
 
     }
-//    =====================================
+
+
+    public static boolean supportsSubDirectoryToken(String original) {
+        String[] parts = original.split("\\?");
+        // Either '/*' or '\*' before query string
+        return parts[0].endsWith("/*") || parts[0].endsWith("\\*");
+    }
+
+    public static String sanitizeFileUriWithSub(String original) {
+        int INCLUDE_SUB_DIR_SYMBOL_LENGTH = 2;
+        String[] parts = original.split("\\?");
+        parts[0] = parts[0].substring(0, parts[0].length() - INCLUDE_SUB_DIR_SYMBOL_LENGTH);
+        return parts.length == 1 ? parts[0] : parts[0] + "?" + parts[1];
+    }
+
+    public static Action getActionAfterProcess(VFSConfig vfsConfig, int actionAfterProcess) {
+        switch (actionAfterProcess) {
+            case VFSConfig.DELETE:
+                return new DeleteAction();
+            case VFSConfig.MOVE:
+                return new MoveAction(vfsConfig.getMoveAfterProcess());
+            default:
+                return null;
+        }
+    }
+
+    public static FileObject[] sortFileObjects(FileObject[] children, String strSortParam, VFSConfig vfsProperties) {
+        if (strSortParam != null && !"NONE".equals(strSortParam)) {
+            log.debug("Start Sorting the files.");
+            boolean strSortOrder = vfsProperties.isFileSortAscending();
+            if (log.isDebugEnabled()) {
+                log.debug("Sorting the files by : " + strSortOrder + ". (" + strSortOrder + ")");
+            }
+            if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_NAME) && strSortOrder) {
+                Arrays.sort(children, new FileNameAscComparator());
+            } else if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_NAME)) {
+                Arrays.sort(children, new FileNameDesComparator());
+            } else if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_SIZE) && strSortOrder) {
+                Arrays.sort(children, new FileSizeAscComparator());
+            } else if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_SIZE)) {
+                Arrays.sort(children, new FileSizeDesComparator());
+            } else if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_LASTMODIFIEDTIMESTAMP)
+                    && strSortOrder) {
+                Arrays.sort(children, new FileLastmodifiedtimestampAscComparator());
+            } else if (strSortParam.equals(VFSConstants.FILE_SORT_VALUE_LASTMODIFIEDTIMESTAMP)) {
+                Arrays.sort(children, new FileLastmodifiedtimestampDesComparator());
+            }
+            log.debug("End Sorting the files.");
+        }
+        return children;
+    }
+
+    /**
+     * Comparator classed used to sort the files according to user input
+     */
+    public static class FileNameAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            return o1.getName().compareTo(o2.getName());
+        }
+    }
+
+    static class FileLastmodifiedtimestampAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0l;
+            try {
+                lDiff = o1.getContent().getLastModifiedTime() - o2.getContent().getLastModifiedTime();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileSizeAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0l;
+            try {
+                lDiff = o1.getContent().getSize() - o2.getContent().getSize();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare size of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileNameDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            return o2.getName().compareTo(o1.getName());
+        }
+    }
+
+    static class FileLastmodifiedtimestampDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0l;
+            try {
+                lDiff = o2.getContent().getLastModifiedTime() - o1.getContent().getLastModifiedTime();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileSizeDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0l;
+            try {
+                lDiff = o2.getContent().getSize() - o1.getContent().getSize();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare size of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
 }
