@@ -337,6 +337,35 @@
               "defaultValue": false,
               "required": "false"
             }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.AutoLockReleaseInterval",
+              "displayName": "Auto Lock Release Interval",
+              "inputType": "string",
+              "required": "true",
+              "enableCondition": [
+                {
+                  "transport.vfs.AutoLockRelease": true
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.LockReleaseSameNode",
+              "displayName": "Auto Lock Release Same Node",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "true",
+              "enableCondition": [
+                {
+                  "transport.vfs.AutoLockRelease": true
+                }
+              ]
+            }
           }
         ]
       }

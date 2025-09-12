@@ -21,14 +21,13 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class VFSUtils {
+public class Utils {
 
-    private static final Log log = LogFactory.getLog(VFSUtils.class);
+    private static final Log log = LogFactory.getLog(Utils.class);
 
     private static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z0-9]+://.*");
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(":(?:[^/]+)@");
@@ -473,4 +472,5 @@ public class VFSUtils {
             return lDiff.intValue();
         }
     }
+
 }

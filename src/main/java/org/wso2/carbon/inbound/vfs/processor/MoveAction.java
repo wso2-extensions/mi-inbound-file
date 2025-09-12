@@ -4,10 +4,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
-import org.wso2.carbon.inbound.vfs.VFSConsumer;
-import org.wso2.carbon.inbound.vfs.VFSUtils;
+import org.wso2.carbon.inbound.vfs.Utils;
 
-import static org.wso2.carbon.inbound.vfs.VFSUtils.sanitizeFileUriWithSub;
+import static org.wso2.carbon.inbound.vfs.Utils.sanitizeFileUriWithSub;
 
 public class MoveAction implements Action {
 
@@ -24,7 +23,7 @@ public class MoveAction implements Action {
         // after success
         try {
             if (targetLocation != null && targetLocation.trim().length() > 0) {
-                if (VFSUtils.supportsSubDirectoryToken(targetLocation)) {
+                if (Utils.supportsSubDirectoryToken(targetLocation)) {
                     targetLocation = sanitizeFileUriWithSub(targetLocation);
                 }
                 log.info("Moving file to " + targetLocation);

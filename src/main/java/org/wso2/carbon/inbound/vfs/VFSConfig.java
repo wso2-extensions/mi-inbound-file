@@ -290,10 +290,10 @@ public class VFSConfig {
     public String getFileURI() {
         if (resolveHostsDynamically) {
             try {
-                return VFSUtils.resolveUriHost(fileURI);
+                return Utils.resolveUriHost(fileURI);
             } catch (UnknownHostException | FileSystemException e) {
                 String message = "Unable to resolve the hostname of transport.vfs.FileURI : " +
-                        VFSUtils.maskURLPassword(fileURI);
+                        Utils.maskURLPassword(fileURI);
                 VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.WARN, message, e);
             }
         }
@@ -311,15 +311,15 @@ public class VFSConfig {
     private String resolveHostAtDeployment(String uri) throws AxisFault {
         if (!resolveHostsDynamically) {
             try {
-                return VFSUtils.resolveUriHost(uri, new StringBuilder());
+                return Utils.resolveUriHost(uri, new StringBuilder());
             } catch (FileSystemException e) {
-                String errorMsg = "Unable to decode the malformed URI : " + VFSUtils.maskURLPassword(uri);
+                String errorMsg = "Unable to decode the malformed URI : " + Utils.maskURLPassword(uri);
                 //log the error since if we only throw AxisFault, we won't get the entire stacktrace in logs to
                 // identify root cause to users
                 VFSTransportErrorHandler.handleException(log, errorMsg, e);
 
             } catch (UnknownHostException e) {
-                String errorMsg = "Error occurred while resolving hostname of URI : " + VFSUtils.maskURLPassword(uri);
+                String errorMsg = "Error occurred while resolving hostname of URI : " + Utils.maskURLPassword(uri);
                 //log the error since if we only throw AxisFault, we won't get the entire stacktrace in logs to
                 // identify root cause to users
                 VFSTransportErrorHandler.handleException(log, errorMsg, e);

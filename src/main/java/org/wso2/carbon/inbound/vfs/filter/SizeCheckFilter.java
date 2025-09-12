@@ -7,7 +7,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.vfs2.FileSystemManager;
-import org.wso2.carbon.inbound.vfs.VFSUtils;
+import org.wso2.carbon.inbound.vfs.Utils;
 
 import java.io.InputStream;
 import java.nio.file.FileSystemException;
@@ -41,7 +41,7 @@ public class SizeCheckFilter implements Filter {
         InputStream inputStream = null;
         try {
             //get first MD5
-            log.debug("Create MD5 Checksum of File: "+ VFSUtils.maskURLPassword(child.getName().toString()));
+            log.debug("Create MD5 Checksum of File: "+ Utils.maskURLPassword(child.getName().toString()));
             inputStream = child.getContent().getInputStream();
             String md5 = getMD5Checksum(inputStream);
             return isFileEmpty(md5) || isFileStillChangingSize(child, md5);
