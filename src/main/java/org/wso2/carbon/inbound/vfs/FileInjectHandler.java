@@ -59,13 +59,13 @@ public class FileInjectHandler {
     private String injectingSeq;
     private String onErrorSeq;
     private boolean sequential;
-    private Properties vfsProperties;
+    private VFSConfig vfsProperties;
     private SynapseEnvironment synapseEnvironment;
     private Map<String, Object> transportHeaders;
     private String fileURI;
 
     public FileInjectHandler(String injectingSeq, String onErrorSeq, boolean sequential,
-                             SynapseEnvironment synapseEnvironment, Properties vfsProperties) {
+                             SynapseEnvironment synapseEnvironment, VFSConfig vfsProperties) {
         this.injectingSeq = injectingSeq;
         this.onErrorSeq = onErrorSeq;
         this.sequential = sequential;
@@ -90,7 +90,7 @@ public class FileInjectHandler {
 
             InboundEndpoint inboundEndpoint = msgCtx.getConfiguration().getInboundEndpoint(name);
             CustomLogSetter.getInstance().setLogAppender(inboundEndpoint.getArtifactContainerName());
-            String contentType = vfsProperties.getProperty(VFSConstants.TRANSPORT_FILE_CONTENT_TYPE);
+            String contentType = vfsProperties.getContentType();
             if (contentType == null || contentType.trim().equals("")) {
                 if (file.getName().getExtension().toLowerCase().endsWith("xml")) {
                     contentType = "text/xml";
@@ -102,9 +102,7 @@ public class FileInjectHandler {
                 // set the CHARACTER_SET_ENCODING property as e.g. SOAPBuilder relies on this.
                 String charSetEnc = null;
                 try {
-                    if (contentType != null) {
-                        charSetEnc = new ContentType(contentType).getParameter("charset");
-                    }
+                    charSetEnc = new ContentType(contentType).getParameter("charset");
                 } catch (ParseException ex) {
                     // ignore
                 }
@@ -133,14 +131,12 @@ public class FileInjectHandler {
             }
 
             // set the message payload to the message context
-            String streaming = vfsProperties.getProperty(VFSConstants.STREAMING);
+            boolean isStreaming = vfsProperties.isStreaming();
 
-            if (builder instanceof DataSourceMessageBuilder && "true".equals(streaming)) {
+            if (builder instanceof DataSourceMessageBuilder && isStreaming) {
                 dataSource = ManagedDataSourceFactory.create(new FileObjectDataSource(file, contentType));
-                in = null;
             } else {
                 in = new AutoCloseInputStream(file.getContent().getInputStream());
-                dataSource = null;
             }
 
             //Inject the message to the sequence.
@@ -153,7 +149,7 @@ public class FileInjectHandler {
                         .processDocument(dataSource, contentType, axis2MsgCtx);
             }
 
-            if ("true".equals(vfsProperties.getProperty(VFSConstants.TRANSPORT_BUILD))) {
+            if (vfsProperties.isBuild()) {
                 documentElement.build();
             }
             msgCtx.setEnvelope(TransportUtils.createSOAPEnvelope(documentElement));

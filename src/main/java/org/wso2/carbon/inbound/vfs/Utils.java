@@ -1,5 +1,6 @@
 package org.wso2.carbon.inbound.vfs;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.vfs2.FileObject;
@@ -16,14 +17,22 @@ import org.wso2.carbon.inbound.vfs.processor.Action;
 import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.wso2.carbon.inbound.vfs.lock.LockManager.getFullPath;
 
 public class Utils {
 
@@ -372,7 +381,7 @@ public class Utils {
             case VFSConfig.DELETE:
                 return new DeleteAction();
             case VFSConfig.MOVE:
-                return new MoveAction(vfsConfig.getMoveAfterProcess());
+                return new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig);
             default:
                 return null;
         }
@@ -473,4 +482,101 @@ public class Utils {
         }
     }
 
+    public static String optionallyAppendDateToUri(String moveToDirectoryURI, VFSConfig vfsConfig) {
+        String strSubfoldertimestamp = vfsConfig.getSubfolderTimestamp();
+        if (strSubfoldertimestamp != null) {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat(strSubfoldertimestamp);
+                String strDateformat = sdf.format(new Date());
+                int iIndex = moveToDirectoryURI.indexOf("?");
+                if (iIndex > -1) {
+                    moveToDirectoryURI = moveToDirectoryURI.substring(0, iIndex)
+                            + strDateformat
+                            + moveToDirectoryURI.substring(iIndex);
+                }else{
+                    moveToDirectoryURI += strDateformat;
+                }
+            } catch (Exception e) {
+                log.warn("Error generating subfolder name with date", e);
+            }
+        }
+        return moveToDirectoryURI;
+    }
+
+    public static synchronized void addFailedRecord(VFSConfig vfsConfig,
+                                                    FileObject failedObject,
+                                                    String timeString) {
+//        String serviceName = vfsConfig.getServiceName();
+        try {
+            String record = failedObject.getName().getBaseName() + VFSConstants.FAILED_RECORD_DELIMITER
+                    + timeString;
+            String recordFile = vfsConfig.getFailedRecordFileDestination() +
+                    vfsConfig.getFailedRecordFileName();
+            File failedRecordFile = new File(recordFile);
+            if (!failedRecordFile.exists()) {
+                FileUtils.writeStringToFile(failedRecordFile, record);
+                if (log.isDebugEnabled()) {
+                    log.debug("Added fail record '"
+                            + Utils.maskURLPassword(record.toString())
+                            + "' into the record file '"
+                            + recordFile + "'");
+                }
+            } else {
+                List<String> content = FileUtils.readLines(failedRecordFile);
+                if (!content.contains(record)) {
+                    content.add(record);
+                }
+                FileUtils.writeLines(failedRecordFile, content);
+            }
+        } catch (IOException e) {
+            VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.FATAL,
+                    "Failure while writing the failed records!", e);
+        }
+    }
+
+    public static String getSystemTime(String dateFormat) {
+        return (new SimpleDateFormat(dateFormat)).format(new Date());
+    }
+
+    public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
+        byte[] failValue = Long.toString((new Date()).getTime()).getBytes();
+
+        try {
+            String fullPath = getFullPath(fo);
+            FileObject failObject = fsManager.resolveFile(fullPath + ".fail", fso);
+            if (!failObject.exists()) {
+                failObject.createFile();
+            }
+
+            OutputStream stream = failObject.getContent().getOutputStream();
+
+            try {
+                stream.write(failValue);
+                stream.flush();
+            } catch (IOException var17) {
+                failObject.delete();
+                log.error("Couldn't create the fail file before processing the file " + maskURLPassword(fullPath), var17);
+            } finally {
+                try {
+                    stream.close();
+                } catch (IOException var16) {
+                    log.debug("Error closing stream", var16);
+                }
+
+                failObject.close();
+            }
+        } catch (FileSystemException var19) {
+            log.error("Cannot get the lock for the file : " + maskURLPassword(fo.getName().getURI()) + " before processing");
+        }
+    }
+
+    public static String getFullPath(FileObject fo) {
+        String fullPath = fo.getName().getURI();
+        int pos = fullPath.indexOf(63);
+        if (pos != -1) {
+            fullPath = fullPath.substring(0, pos);
+        }
+
+        return fullPath;
+    }
 }

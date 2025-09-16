@@ -83,6 +83,7 @@ public class VFSConfig {
 
 
     private boolean streaming;
+    private boolean build;
 
     private int maxRetryCount;
     private long reconnectTimeout;
@@ -162,6 +163,8 @@ public class VFSConfig {
                 properties.getProperty(VFSConstants.UPDATE_LAST_MODIFIED, "false"));
         this.streaming = Boolean.parseBoolean(
                 properties.getProperty(VFSConstants.STREAMING, "false"));
+        this.build = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.TRANSPORT_BUILD, "false"));
         this.fileLocking = VFSConstants.TRANSPORT_FILE_LOCKING_ENABLED.equalsIgnoreCase(
                 properties.getProperty(VFSConstants.TRANSPORT_FILE_LOCKING, VFSConstants.TRANSPORT_FILE_LOCKING_DISABLED));
         this.forceCreateFolder = Boolean.parseBoolean(
@@ -539,5 +542,9 @@ public class VFSConfig {
 
     public Long getMaximumAge() {
         return maximumAge;
+    }
+
+    public boolean isBuild() {
+        return build;
     }
 }

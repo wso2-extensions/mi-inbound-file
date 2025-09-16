@@ -61,7 +61,6 @@ public class PostProcessingHandler implements PostProcessor {
     }
 
     public void setOnSuccessAction(Action onSuccessAction) {
-
         this.onSuccessAction = onSuccessAction;
     }
 

@@ -8,6 +8,7 @@ import org.apache.commons.vfs2.FileSystemManager;
 import org.apache.commons.vfs2.FileSystemOptions;
 import org.apache.commons.vfs2.impl.DefaultFileSystemManager;
 import org.apache.synapse.commons.vfs.VFSParamDTO;
+import org.wso2.carbon.inbound.vfs.Utils;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,21 +31,25 @@ public class LockManager {
     private boolean autoLockReleaseSameNode;
     private long autoLockReleaseInterval;
     private boolean distributedLock;
-//    private long distributedLockTimeout;
+    private final long distributedLockTimeout;
     private org.apache.commons.vfs2.FileSystemManager fsManager;
     private org.apache.commons.vfs2.FileSystemOptions fso;
+    private final boolean clusterWare;
 
     public LockManager(boolean fileLock, boolean autoLockRelease, boolean autoLockReleaseSameNode,
                        long autoLockReleaseInterval, boolean distributedLock,
-                       org.apache.commons.vfs2.FileSystemManager fsManager, org.apache.commons.vfs2.FileSystemOptions fso) {
+                       org.apache.commons.vfs2.FileSystemManager fsManager,
+                       org.apache.commons.vfs2.FileSystemOptions fso, long distributedLockTimeout,
+                       boolean clusterWare) {
         this.fileLock = fileLock;
         this.autoLockRelease = autoLockRelease;
         this.autoLockReleaseSameNode = autoLockReleaseSameNode;
         this.autoLockReleaseInterval = autoLockReleaseInterval;
         this.distributedLock = distributedLock;
-//        this.distributedLockTimeout = distributedLockTimeout;
+        this.distributedLockTimeout = distributedLockTimeout;
         this.fsManager = fsManager;
         this.fso = fso;
+        this.clusterWare = clusterWare;
     }
 
     /**
@@ -81,10 +86,11 @@ public class LockManager {
         vfsParamDTO.setAutoLockReleaseInterval(autoLockReleaseInterval);
 
         // Additional distributed lock parameters if needed
-        if (distributedLock) {
+
+        if (clusterWare && distributedLock) {
             // Set distributed lock params if your VFSParamDTO supports them
-            // vfsParamDTO.setDistributedLock(distributedLock);
-            // vfsParamDTO.setDistributedLockTimeout(distributedLockTimeout);
+//             vfsParamDTO.setDistributedLock(distributedLock);
+//             vfsParamDTO.setDistributedLockTimeout(distributedLockTimeout);
         }
 
         return acquireLock(fsManager, fileObject, vfsParamDTO, fso, true);
@@ -96,7 +102,7 @@ public class LockManager {
         String strLockValue = getLockValue();
         byte[] lockValue = strLockValue.getBytes();
         FileObject lockObject = null;
-        String fullPath = getFullPath(fo);
+        String fullPath = Utils.getFullPath(fo);
 
         try {
             lockObject = fsManager.resolveFile(fullPath + ".lock", fso);
@@ -157,16 +163,6 @@ public class LockManager {
 
         lockValueBuilder.append(":").append((new Date()).getTime());
         return lockValueBuilder.toString();
-    }
-
-    private static String getFullPath(FileObject fo) {
-        String fullPath = fo.getName().getURI();
-        int pos = fullPath.indexOf(63);
-        if (pos != -1) {
-            fullPath = fullPath.substring(0, pos);
-        }
-
-        return fullPath;
     }
 
     private static void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject, Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {

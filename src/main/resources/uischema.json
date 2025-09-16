@@ -83,11 +83,48 @@
           {
             "type": "attribute",
             "value": {
+              "name": "scheduleType",
+              "displayName": "Schedule Type",
+              "inputType": "combo",
+              "defaultValue": "Polling",
+              "required": "true",
+              "helpTip": "The polling type for the connection.",
+              "comboValues": [
+                "Polling",
+                "Cron"
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "interval",
               "displayName": "Polling Interval",
               "inputType": "string",
               "defaultValue": "",
-              "required": "true"
+              "required": "true",
+              "helpTip": "The interval for the connection.",
+              "enableCondition": [
+                {
+                  "authType": "Polling"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cronExpression",
+              "displayName": "Cron Expression",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The cron for the connection.",
+              "enableCondition": [
+                {
+                  "authType": "cron"
+                }
+              ]
             }
           },
           {
@@ -123,13 +160,51 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.FileProcessInterval",
-              "displayName": "Processing Interval",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
+              "name": "processingConfigType",
+              "displayName": "File Processing Configuration",
+              "inputType": "combo",
+              "defaultValue": "Count",
+              "required": "true",
+              "helpTip": "Choose how file processing is controlled.",
+              "comboValues": [
+                "Count",
+                "Interval"
+              ]
             }
           },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileProcessCount",
+              "displayName": "File Process Count",
+              "inputType": "string",
+              "defaultValue": "1",
+              "required": "false",
+              "helpTip": "Maximum number of files to process in a single polling cycle.",
+              "enableCondition": [
+                {
+                  "processingConfigType": "Count"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileProcessInterval",
+              "displayName": "File Process Interval (ms)",
+              "inputType": "string",
+              "defaultValue": "0",
+              "required": "false",
+              "helpTip": "Delay (in milliseconds) between processing consecutive files.",
+              "enableCondition": [
+                {
+                  "processingConfigType": "Interval"
+                }
+              ]
+            }
+          }
+        ,
           {
             "type": "attribute",
             "value": {
@@ -345,6 +420,7 @@
               "displayName": "Auto Lock Release Interval",
               "inputType": "string",
               "required": "true",
+              "defaultValue": "15000",
               "enableCondition": [
                 {
                   "transport.vfs.AutoLockRelease": true
@@ -376,16 +452,6 @@
         "groupName": "Other",
         "isCollapsed": true,
         "elements": [
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.DistributedTimeout",
-              "displayName": "Distributed Timeout",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
-            }
-          },
           {
             "type": "attribute",
             "value": {
@@ -465,16 +531,6 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.FileProcessCount",
-              "displayName": "File Process Count",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
               "name": "transport.vfs.Streaming",
               "displayName": "Streaming",
               "inputType": "checkbox",
@@ -510,6 +566,21 @@
               "inputType": "checkbox",
               "defaultValue": false,
               "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.DistributedTimeout",
+              "displayName": "Distributed Timeout",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true",
+              "enableCondition": [
+                {
+                  "transport.vfs.DistributedLock": true
+                }
+              ]
             }
           },
           {
