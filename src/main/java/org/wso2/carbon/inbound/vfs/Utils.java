@@ -32,8 +32,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.wso2.carbon.inbound.vfs.lock.LockManager.getFullPath;
-
 public class Utils {
 
     private static final Log log = LogFactory.getLog(Utils.class);

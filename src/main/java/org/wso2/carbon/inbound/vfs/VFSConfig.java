@@ -24,6 +24,7 @@ import org.apache.axis2.description.AxisService;
 import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterInclude;
 import org.apache.axis2.transport.base.ParamUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.vfs2.FileSystemException;
@@ -52,6 +53,8 @@ public class VFSConfig {
     private String fileURI;
     /** The URI to send replies to. May be null. */
     private String replyFileURI;
+    private String replayFileName;
+
     /** file name pattern for a directory or compressed file entry */
     private String fileNamePattern;
     /** Content-Type to use for the message */
@@ -149,12 +152,16 @@ public class VFSConfig {
     
     private Long minimumAge = null; //defines a minimum age of a file before being consumed. Use to avoid just written files to be consumed
     private Long maximumAge = null; //defines a maximum age of a file being consumed. Old files will stay in the directory
-
+    private boolean append = false;
+    private boolean avoidPermissionCheck = false;
+    private boolean passive = false;
+    private Long failedRecordNextRetryDuration = 30000L;
 
     public VFSConfig(Properties properties) {
         // Basic URIs
         this.fileURI = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_URI);
         this.replyFileURI = properties.getProperty(VFSConstants.REPLY_FILE_URI);
+        this.replayFileName   = properties.getProperty(VFSConstants.REPLY_FILE_NAME);
         this.fileNamePattern = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_NAME_PATTERN);
         this.contentType = properties.getProperty(VFSConstants.TRANSPORT_FILE_CONTENT_TYPE);
 
@@ -272,6 +279,25 @@ public class VFSConfig {
 
         // Secure vault related
         this.secureVaultProperties = properties;
+        this.append = Boolean.parseBoolean(
+                properties.getProperty(VFSConstants.APPEND, "false"));
+
+//TODO:        this.avoidPermissionCheck = Boolean.parseBoolean(VFSConstants.AVOID_PERMISSION_CHECK);
+
+        this.passive = Boolean.parseBoolean(
+                properties.getProperty("vfs.passive", "false"));
+
+        String retryDurationStr = properties.getProperty(VFSConstants.TRANSPORT_FAILED_RECORD_NEXT_RETRY_DURATION);
+        if (StringUtils.isNotEmpty(retryDurationStr)) {
+            try {
+                this.failedRecordNextRetryDuration = Long.parseLong(retryDurationStr);
+            } catch (NumberFormatException e) {
+                this.failedRecordNextRetryDuration = Long.parseLong(
+                        properties.getProperty("30000"));
+                log.warn("Invalid failedRecordNextRetryDuration value: " + retryDurationStr +
+                        ". Using default: " + failedRecordNextRetryDuration);
+            }
+        }
     }
 
     /**
@@ -546,5 +572,25 @@ public class VFSConfig {
 
     public boolean isBuild() {
         return build;
+    }
+
+    public String getReplayFileName() {
+        return replayFileName;
+    }
+
+    public boolean isAppend() {
+        return append;
+    }
+
+    public boolean isAvoidPermissionCheck() {
+        return avoidPermissionCheck;
+    }
+
+    public boolean isPassive() {
+        return passive;
+    }
+
+    public Long getFailedRecordNextRetryDuration() {
+        return failedRecordNextRetryDuration;
     }
 }

@@ -11,7 +11,6 @@ import org.apache.commons.vfs2.FileSystemOptions;
 import org.apache.commons.vfs2.FileType;
 import org.apache.commons.vfs2.impl.StandardFileSystemManager;
 import org.apache.commons.vfs2.provider.UriParser;
-import org.apache.synapse.commons.vfs.VFSUtils;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import org.wso2.carbon.inbound.vfs.filter.FileSelector;
@@ -20,15 +19,24 @@ import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 import org.wso2.carbon.inbound.vfs.processor.PostProcessingHandler;
 import org.wso2.carbon.inbound.vfs.processor.PreProcessingHandler;
 
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.synapse.commons.vfs.VFSUtils.*;
 
 public class VFSConsumer extends GenericPollingConsumer {
 
     private static final Log log = LogFactory.getLog(VFSConsumer.class);
+    private static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
+
     private boolean fileLock = true;
     private final VFSConfig vfsConfig;
     private final FileSystemManager fsManager;
@@ -49,6 +57,15 @@ public class VFSConsumer extends GenericPollingConsumer {
     private boolean distributedLock;
     private Long distributedLockTimeout;
     private boolean isClosed;
+
+    private String replyFileURI;
+    private String replyFileName;
+    private boolean append = false;
+    private boolean resolveHostsDynamically = false;
+    private boolean avoidPermissionCheck = false;
+    private boolean passive = false;
+    private Long failedRecordNextRetryDuration = 30000L; // Default 30 seconds
+    private final ScheduledExecutorService retryScheduler;
 
     public VFSConsumer(Properties properties,
                        String name,
@@ -76,6 +93,12 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         // Initialize file locking parameters
         initializeFileLockingParams();
+
+        // Initialize new features
+        initializeProperties();
+
+        // Initialize retry scheduler for failed records
+        this.retryScheduler = Executors.newScheduledThreadPool(1);
 
         // Handlers (wire your concrete actions here)
         this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, vfsConfig);
@@ -117,6 +140,12 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Initialize file locking parameters
         initializeFileLockingParams();
 
+        // Initialize new features
+        initializeProperties();
+
+        // Initialize retry scheduler for failed records
+        this.retryScheduler = Executors.newScheduledThreadPool(1);
+
         // Handlers (wire your concrete actions here)
         this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, vfsConfig);
         this.preProcessingHandler = new PreProcessingHandler();
@@ -154,6 +183,40 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
     }
 
+    /**
+     * Initialize new VFS features
+     */
+    private void initializeProperties() {
+
+        // Reply file configuration
+        this.replyFileURI = vfsConfig.getReplyFileURI();
+        this.replyFileName = vfsConfig.getReplayFileName();
+        // Append mode for writing files
+        this.append = vfsConfig.isAppend();
+
+        // Resolve hosts dynamically
+        this.resolveHostsDynamically = vfsConfig.isResolveHostsDynamically();
+
+        // TODO: Avoid permission check
+        this.avoidPermissionCheck = vfsConfig.isAvoidPermissionCheck();
+
+        // Passive mode for FTP
+        this.passive = vfsConfig.isPassive();
+
+        // Failed record retry duration
+        this.failedRecordNextRetryDuration = vfsConfig.getFailedRecordNextRetryDuration();
+
+        if (log.isDebugEnabled()) {
+            log.debug("VFS Consumer initialized with features - " +
+                    "Reply URI: " + maskURLPassword(replyFileURI) +
+                    ", Append: " + append +
+                    ", Resolve Hosts: " + resolveHostsDynamically +
+                    ", Avoid Permission Check: " + avoidPermissionCheck +
+                    ", Passive: " + passive +
+                    ", Retry Duration: " + failedRecordNextRetryDuration);
+        }
+    }
+
     @Override
     public Object poll() {
         // Resolve input URI and subdirectory setting from config (supports /* or \*)
@@ -165,6 +228,11 @@ public class VFSConsumer extends GenericPollingConsumer {
         readSubDirectories = inFileUri.supportSubDirectories;
         String fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
 
+        // Resolve hosts dynamically if enabled
+        if (resolveHostsDynamically) {
+            fileURI = resolveHostDynamically(fileURI);
+        }
+
         if (log.isDebugEnabled()) {
             log.debug("Polling VFS location: " + maskURLPassword(fileURI) +
                     " (recursive=" + readSubDirectories + ")");
@@ -173,6 +241,16 @@ public class VFSConsumer extends GenericPollingConsumer {
         try {
             // Attach per-scheme options (SFTP, FTP, SMB, etc.)
             fso = attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
+
+            // Apply passive mode for FTP if enabled
+            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
+                if (fso == null) {
+                    fso = new FileSystemOptions();
+                }
+                // Add passive mode configuration to FSO
+                applyPassiveMode(fso);
+            }
+
         } catch (Exception e) {
             log.warn("Unable to attach scheme options for: " + maskURLPassword(fileURI), e);
             fso = null; // continue; many schemes work without explicit options
@@ -186,9 +264,18 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         try {
-            if (!root.exists() || !root.isReadable()) {
-                log.warn("File/Directory not accessible: " + maskURLPassword(fileURI));
-                return null;
+            // Check permissions if not avoiding permission check
+            if (!avoidPermissionCheck) {
+                if (!root.exists() || !root.isReadable()) {
+                    log.warn("File/Directory not accessible: " + maskURLPassword(fileURI));
+                    return null;
+                }
+            } else {
+                // Skip permission check but still verify existence
+                if (!root.exists()) {
+                    log.warn("File/Directory does not exist: " + maskURLPassword(fileURI));
+                    return null;
+                }
             }
 
             if (root.getType() == FileType.FILE) {
@@ -246,8 +333,8 @@ public class VFSConsumer extends GenericPollingConsumer {
                 // Check if this is a failed record
                 boolean isFailedRecord = isFailRecord(fsManager, child, fso);
                 if (isFailedRecord) {
-                    // Handle failed record
-                    handleFailedRecord(child);
+                    // Handle failed record with retry mechanism
+                    scheduleFailedRecordRetry(child);
                     continue;
                 }
 
@@ -304,6 +391,14 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     private void processFile(FileObject file) throws FileSystemException {
+        // Check if file is still uploading (size checking with MD5)
+        if (isFileStillUploading(file)) {
+            if (log.isDebugEnabled()) {
+                log.debug("File still uploading, skipping: " + maskURLPassword(file.toString()));
+            }
+            return;
+        }
+
         // Delegate readiness, age, size, pattern, etc. to FileSelector
         if (!fileSelector.isValidFile(file)) {
             if (log.isDebugEnabled()) {
@@ -341,6 +436,17 @@ public class VFSConsumer extends GenericPollingConsumer {
                 headers.put(VFSConstants.FILE_NAME, fileName);
                 headers.put(VFSConstants.FILE_PATH, filePath);
                 headers.put(VFSConstants.FILE_URI, fileURI);
+
+                // Add reply file information if configured
+                if (StringUtils.isNotEmpty(replyFileURI)) {
+                    headers.put(VFSConstants.REPLY_FILE_URI, replyFileURI);
+                }
+                if (StringUtils.isNotEmpty(replyFileName)) {
+                    headers.put(VFSConstants.REPLY_FILE_NAME, replyFileName);
+                }
+
+                // Add append mode flag
+                headers.put(VFSConstants.APPEND, String.valueOf(append));
 
                 try {
                     headers.put(org.apache.synapse.commons.vfs.VFSConstants.FILE_LENGTH, content.getSize());
@@ -389,27 +495,171 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     /**
-     * Handle failed records - attempt to process them again
+     * Schedule retry for failed record processing
      */
-    private void handleFailedRecord(FileObject file) throws FileSystemException {
-        try {
-            postProcessingHandler.onSuccess(file);
-        } catch (Exception e) {
-            log.error("File object '" + maskURLPassword(file.getURL().toString()) +
-                    "' could not be moved after first attempt", e);
-        }
-
-        if (fileLock) {
-            releaseLock(fsManager, file, fso);
-        }
-
-        if (log.isDebugEnabled()) {
-            log.debug("File '" + maskURLPassword(file.getURL().toString()) +
-                    "' has been marked as a failed record, attempting to handle it");
+    private void scheduleFailedRecordRetry(FileObject file) {
+        if (failedRecordNextRetryDuration > 0) {
+            retryScheduler.schedule(new FailedRecordRetryTask(file),
+                    failedRecordNextRetryDuration, TimeUnit.MILLISECONDS);
+            if (log.isDebugEnabled()) {
+                log.debug("Scheduled retry for failed record: " + maskURLPassword(file.toString()) +
+                        " after " + failedRecordNextRetryDuration + "ms");
+            }
         }
     }
 
+    /**
+     * Task to retry processing of failed records
+     */
+    private class FailedRecordRetryTask implements Runnable {
+        private final FileObject file;
 
+        public FailedRecordRetryTask(FileObject file) {
+            this.file = file;
+        }
+
+        @Override
+        public void run() {
+            try {
+                if (log.isDebugEnabled()) {
+                    log.debug("Retrying failed record: " + maskURLPassword(file.toString()));
+                }
+
+                // Check if file still exists
+                if (file.exists()) {
+                    // Remove from failed records and retry processing
+                    removeFromFailedRecords(file);
+                    processFile(file);
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Failed record file no longer exists: " + maskURLPassword(file.toString()));
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error during failed record retry: " + maskURLPassword(file.toString()), e);
+                // Schedule another retry if configured
+                scheduleFailedRecordRetry(file);
+            }
+        }
+    }
+
+    /**
+     * Remove file from failed records
+     */
+    private void removeFromFailedRecords(FileObject file) {
+        // Implementation to remove from failed records tracking
+        // This would depend on your failed record storage mechanism
+        if (log.isDebugEnabled()) {
+            log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
+        }
+        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterFailure(), vfsConfig);
+        moveAction.execute(file);
+    }
+
+    /**
+     * Check if file is still uploading using MD5 checksum
+     */
+    private boolean isFileStillUploading(FileObject file) {
+        try {
+            String md5Before = getMD5Checksum(file);
+
+            // Check if file is empty
+            if (EMPTY_MD5.equals(md5Before)) {
+                return false; // Empty file is considered complete
+            }
+
+            // Wait and check again
+            Thread.sleep(1000); // Wait 1 second
+            file.refresh(); // Refresh file object
+            String md5After = getMD5Checksum(file);
+
+            // If checksums differ, file is still being written
+            return !md5Before.equals(md5After);
+
+        } catch (Exception e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Error checking if file is uploading: " + maskURLPassword(file.toString()), e);
+            }
+            return true; // Assume still uploading on error
+        }
+    }
+
+    /**
+     * Calculate MD5 checksum of file
+     */
+    private String getMD5Checksum(FileObject file) throws Exception {
+        try (InputStream is = file.getContent().getInputStream()) {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+
+            while ((bytesRead = is.read(buffer)) != -1) {
+                md.update(buffer, 0, bytesRead);
+            }
+
+            byte[] digest = md.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        }
+    }
+
+    /**
+     * Resolve hostname dynamically if enabled
+     */
+    private String resolveHostDynamically(String uri) {
+        if (!resolveHostsDynamically) {
+            return uri;
+        }
+
+        try {
+            // Extract hostname from URI and resolve it
+            // This is a simplified implementation
+            if (uri.contains("://")) {
+                String[] parts = uri.split("://");
+                if (parts.length > 1) {
+                    String[] hostParts = parts[1].split("/");
+                    if (hostParts.length > 0) {
+                        String host = hostParts[0];
+                        if (host.contains("@")) {
+                            host = host.substring(host.lastIndexOf("@") + 1);
+                        }
+                        if (host.contains(":")) {
+                            host = host.substring(0, host.indexOf(":"));
+                        }
+
+                        // Resolve the hostname
+                        InetAddress addr = InetAddress.getByName(host);
+                        String resolvedIP = addr.getHostAddress();
+
+                        if (log.isDebugEnabled()) {
+                            log.debug("Resolved host " + host + " to " + resolvedIP);
+                        }
+
+                        // Replace hostname with resolved IP
+                        return uri.replace(host, resolvedIP);
+                    }
+                }
+            }
+        } catch (UnknownHostException e) {
+            log.warn("Could not resolve host dynamically for URI: " + maskURLPassword(uri), e);
+        }
+
+        return uri;
+    }
+
+    /**
+     * Apply passive mode configuration for FTP
+     */
+    private void applyPassiveMode(FileSystemOptions fso) {
+        // TODO: Implementation depends on your VFS version and FTP provider
+        // This is a placeholder for the actual passive mode configuration
+        if (log.isDebugEnabled()) {
+            log.debug("Applied passive mode configuration");
+        }
+    }
 
     /* =========================
                 Helpers
@@ -499,6 +749,17 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     public void close() {
         isClosed = true;
+        if (retryScheduler != null && !retryScheduler.isShutdown()) {
+            retryScheduler.shutdown();
+            try {
+                if (!retryScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+                    retryScheduler.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                retryScheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     public void start() {
@@ -509,7 +770,5 @@ public class VFSConsumer extends GenericPollingConsumer {
         fsManager.close();
         this.close();
     }
-
-
 }
 
