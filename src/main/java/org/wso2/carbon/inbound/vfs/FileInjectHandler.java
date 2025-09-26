@@ -29,6 +29,7 @@ import org.apache.axis2.format.ManagedDataSource;
 import org.apache.axis2.format.ManagedDataSourceFactory;
 import org.apache.axis2.transport.TransportUtils;
 import org.apache.commons.io.input.AutoCloseInputStream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.vfs2.FileObject;
@@ -36,7 +37,9 @@ import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
 import org.apache.synapse.commons.vfs.FileObjectDataSource;
 import org.apache.synapse.commons.vfs.VFSConstants;
+import org.apache.synapse.commons.vfs.VFSOutTransportInfo;
 import org.apache.synapse.core.SynapseEnvironment;
+import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.inbound.InboundEndpoint;
 import org.apache.synapse.inbound.InboundEndpointConstants;
 import org.apache.synapse.mediators.base.SequenceMediator;
@@ -51,6 +54,8 @@ import java.util.Properties;
 
 import javax.mail.internet.ContentType;
 import javax.mail.internet.ParseException;
+
+import static org.apache.axis2.context.MessageContext.TRANSPORT_HEADERS;
 
 public class FileInjectHandler {
 
@@ -79,7 +84,7 @@ public class FileInjectHandler {
     public boolean invoke(Object object, String name) throws SynapseException {
 
         ManagedDataSource dataSource = null;
-        ;
+
         FileObject file = (FileObject) object;
         InputStream in = null;
         try {
@@ -87,6 +92,10 @@ public class FileInjectHandler {
             msgCtx.setProperty(SynapseConstants.INBOUND_ENDPOINT_NAME, name);
             msgCtx.setProperty(SynapseConstants.ARTIFACT_NAME, SynapseConstants.FAIL_SAFE_MODE_INBOUND_ENDPOINT + name);
             msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
+            if (vfsProperties.getReplyFileURI() != null && !vfsProperties.getReplyFileURI().isEmpty()) {
+                msgCtx.setProperty(Constants.OUT_TRANSPORT_INFO,
+                        new VFSOutTransportInfo(vfsProperties.getReplyFileURI(), vfsProperties.isFileLocking()));
+            }
 
             InboundEndpoint inboundEndpoint = msgCtx.getConfiguration().getInboundEndpoint(name);
             CustomLogSetter.getInstance().setLogAppender(inboundEndpoint.getArtifactContainerName());
@@ -167,9 +176,18 @@ public class FileInjectHandler {
                     seq.init(synapseEnvironment);
                 }
                 seq.setErrorHandler(onErrorSeq);
-                if (!synapseEnvironment.injectInbound(msgCtx, seq, sequential)) {
+//                if (!synapseEnvironment.injectInbound(msgCtx, seq, sequential)) {
+//                    return false;
+//                }
+                synapseEnvironment.injectInbound(msgCtx, seq, sequential);
+//                MessageContext axis2MessageContext = ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
+                Map<String, Object> transportHeaders = (Map<String, Object>) axis2MsgCtx.getProperty(TRANSPORT_HEADERS);
+                String errorCode = (String) transportHeaders.get(VFSConstants.ERROR_CODE);
+                if (StringUtils.isNotEmpty(errorCode)) {
                     return false;
                 }
+                /// set rollback property check = -1
+                ///wrtie body of message.
             } else {
                 log.error("Sequence: " + injectingSeq + " not found");
             }
@@ -215,7 +233,7 @@ public class FileInjectHandler {
                 .getAxis2MessageContext();
         axis2MsgCtx.setServerSide(true);
         axis2MsgCtx.setMessageID(UUIDGenerator.getUUID());
-        axis2MsgCtx.setProperty(MessageContext.TRANSPORT_HEADERS, transportHeaders);
+        axis2MsgCtx.setProperty(TRANSPORT_HEADERS, transportHeaders);
         msgCtx.setProperty(MessageContext.CLIENT_API_NON_BLOCKING, true);
         return msgCtx;
     }

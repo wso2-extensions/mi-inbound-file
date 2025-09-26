@@ -9,6 +9,7 @@ import org.apache.commons.vfs2.FileSystemOptions;
 import org.apache.commons.vfs2.impl.DefaultFileSystemManager;
 import org.apache.synapse.commons.vfs.VFSParamDTO;
 import org.wso2.carbon.inbound.vfs.Utils;
+import org.wso2.carbon.inbound.vfs.VFSConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,23 +31,16 @@ public class LockManager {
     private boolean autoLockRelease;
     private boolean autoLockReleaseSameNode;
     private long autoLockReleaseInterval;
-    private boolean distributedLock;
-    private final long distributedLockTimeout;
-    private org.apache.commons.vfs2.FileSystemManager fsManager;
-    private org.apache.commons.vfs2.FileSystemOptions fso;
+    private final org.apache.commons.vfs2.FileSystemManager fsManager;
+    private final org.apache.commons.vfs2.FileSystemOptions fso;
     private final boolean clusterWare;
 
-    public LockManager(boolean fileLock, boolean autoLockRelease, boolean autoLockReleaseSameNode,
-                       long autoLockReleaseInterval, boolean distributedLock,
+    public LockManager(boolean fileLock, VFSConfig vfsConfig,
                        org.apache.commons.vfs2.FileSystemManager fsManager,
-                       org.apache.commons.vfs2.FileSystemOptions fso, long distributedLockTimeout,
+                       org.apache.commons.vfs2.FileSystemOptions fso,
                        boolean clusterWare) {
         this.fileLock = fileLock;
-        this.autoLockRelease = autoLockRelease;
-        this.autoLockReleaseSameNode = autoLockReleaseSameNode;
-        this.autoLockReleaseInterval = autoLockReleaseInterval;
-        this.distributedLock = distributedLock;
-        this.distributedLockTimeout = distributedLockTimeout;
+        initializeFileLockingParams(vfsConfig);
         this.fsManager = fsManager;
         this.fso = fso;
         this.clusterWare = clusterWare;
@@ -81,13 +75,15 @@ public class LockManager {
 
         // Create VFSParamDTO with lock parameters
         VFSParamDTO vfsParamDTO = new VFSParamDTO();
-        vfsParamDTO.setAutoLockRelease(autoLockRelease);
-        vfsParamDTO.setAutoLockReleaseSameNode(autoLockReleaseSameNode);
-        vfsParamDTO.setAutoLockReleaseInterval(autoLockReleaseInterval);
+        if (autoLockRelease) {
+            vfsParamDTO.setAutoLockRelease(autoLockRelease);
+            vfsParamDTO.setAutoLockReleaseSameNode(autoLockReleaseSameNode);
+            vfsParamDTO.setAutoLockReleaseInterval(autoLockReleaseInterval);
+        }
 
         // Additional distributed lock parameters if needed
 
-        if (clusterWare && distributedLock) {
+        if (clusterWare) {
             // Set distributed lock params if your VFSParamDTO supports them
 //             vfsParamDTO.setDistributedLock(distributedLock);
 //             vfsParamDTO.setDistributedLockTimeout(distributedLockTimeout);
@@ -250,5 +246,20 @@ public class LockManager {
             log.error("Couldn't verify the lock", var4);
             return false;
         }
+    }
+
+
+    /**
+     * Initialize file locking related parameters from properties
+     */
+    private void initializeFileLockingParams(VFSConfig vfsConfig) {
+        // Check if file locking is enabled
+        this.fileLock = vfsConfig.isFileLocking();
+        // Auto lock release configuration
+        this.autoLockRelease = vfsConfig.isAutoLockRelease();
+        if (autoLockRelease) {
+            autoLockReleaseInterval = vfsConfig.getAutoLockReleaseInterval();
+        }
+        this.autoLockReleaseSameNode = vfsConfig.getAutoLockReleaseSameNode();
     }
 }

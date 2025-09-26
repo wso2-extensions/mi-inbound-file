@@ -4,8 +4,6 @@ import org.apache.commons.vfs2.FileObject;
 
 public interface PostProcessor {
 
-    void onSuccess(FileObject fileObject);
-    void onFail(FileObject fileObject);
-    void onSuccessActionFail(FileObject fileObject);
-    void onFailActionFail(FileObject fileObject);
+    void onSuccess(FileObject fileObject) throws Exception;
+    void onFail(FileObject fileObject) throws Exception;
 }

@@ -13,6 +13,7 @@ import org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
 import org.apache.commons.vfs2.provider.ftps.FtpsMode;
 import org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 import org.apache.synapse.commons.vfs.VFSConstants;
+import org.apache.synapse.commons.vfs.VFSUtils;
 import org.wso2.carbon.inbound.vfs.processor.Action;
 import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
@@ -27,8 +28,10 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,96 +95,96 @@ public class Utils {
         }
     }
 
-    public static FileSystemOptions attachFileSystemOptions(Map<String, String> options, FileSystemManager fsManager)
-            throws FileSystemException {
-        if (options == null) {
-            return null;
-        }
-
-        FileSystemOptions opts = new FileSystemOptions();
-        DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
-
-        // setting all available configs regardless of the options.get(VFSConstants.SCHEME)
-        // because schemes of FileURI and MoveAfterProcess can be different
-
-        //sftp configs
-        for (Map.Entry<String, String> entry : options.entrySet()) {
-            for (org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION option : org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION.values()) {
-                if (entry.getKey().equals(option.toString()) && entry.getValue() != null) {
-                    delegate.setConfigString(opts, org.apache.synapse.commons.vfs.VFSConstants.SCHEME_SFTP, entry.getKey().toLowerCase(),
-                            entry.getValue());
-                }
-            }
-        }
-
-        FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
-
-        // ftp and ftps configs
-        String passiveMode = options.get(PASSIVE_MODE);
-        if (passiveMode != null) {
-            configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
-        }
-
-        // ftps configs
-        String implicitMode = options.get(IMPLICIT_MODE);
-        if (implicitMode != null) {
-            if (Boolean.parseBoolean(implicitMode)) {
-                configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
-            } else {
-                configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
-            }
-        }
-        String protectionMode = options.get(PROTECTION_MODE);
-        if ("P".equalsIgnoreCase(protectionMode)) {
-            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
-        } else if ("C".equalsIgnoreCase(protectionMode)) {
-            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
-        } else if ("S".equalsIgnoreCase(protectionMode)) {
-            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
-        } else if ("E".equalsIgnoreCase(protectionMode)) {
-            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
-        }
-//        String keyStore = options.get(KEY_STORE);
-//        if (keyStore != null) {
-//            configBuilder.setKeyStore(opts, keyStore);
-//        }
-//        String trustStore = options.get(TRUST_STORE);
-//        if (trustStore != null) {
-//            configBuilder.setTrustStore(opts, trustStore);
-//        }
-//        String keyStorePassword = options.get(KS_PASSWD);
-//        if (keyStorePassword != null) {
-//            configBuilder.setKeyStorePW(opts, keyStorePassword);
-//        }
-//        String trustStorePassword = options.get(TS_PASSWD);
-//        if (trustStorePassword != null) {
-//            configBuilder.setTrustStorePW(opts, trustStorePassword);
-//        }
-//        String keyPassword = options.get(KEY_PASSWD);
-//        if (keyPassword != null) {
-//            configBuilder.setKeyPW(opts, keyPassword);
-//        }
-
-        if (options.get(org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE) != null) {
-            delegate.setConfigString(opts, options.get(
-                            org.apache.synapse.commons.vfs.VFSConstants.SCHEME), org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE,
-                    options.get(VFSConstants.FILE_TYPE));
-        }
-
-//        Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
-//
-//        boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
-//        if (options.get(ENCRYPTION_ENABLED) != null) {
-//            smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
+//    public static FileSystemOptions attachFileSystemOptions(Map<String, String> options, FileSystemManager fsManager)
+//            throws FileSystemException {
+//        if (options == null) {
+//            return null;
 //        }
 //
-//        String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
-//        if (diskfileshare != null) {
-//            smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
+//        FileSystemOptions opts = new FileSystemOptions();
+//        DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
+//
+//        // setting all available configs regardless of the options.get(VFSConstants.SCHEME)
+//        // because schemes of FileURI and MoveAfterProcess can be different
+//
+//        //sftp configs
+//        for (Map.Entry<String, String> entry : options.entrySet()) {
+//            for (org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION option : org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION.values()) {
+//                if (entry.getKey().equals(option.toString()) && entry.getValue() != null) {
+//                    delegate.setConfigString(opts, org.apache.synapse.commons.vfs.VFSConstants.SCHEME_SFTP, entry.getKey().toLowerCase(),
+//                            entry.getValue());
+//                }
+//            }
 //        }
-
-        return opts;
-    }
+//
+//        FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
+//
+//        // ftp and ftps configs
+//        String passiveMode = options.get(PASSIVE_MODE);
+//        if (passiveMode != null) {
+//            configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
+//        }
+//
+//        // ftps configs
+//        String implicitMode = options.get(IMPLICIT_MODE);
+//        if (implicitMode != null) {
+//            if (Boolean.parseBoolean(implicitMode)) {
+//                configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
+//            } else {
+//                configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
+//            }
+//        }
+//        String protectionMode = options.get(PROTECTION_MODE);
+//        if ("P".equalsIgnoreCase(protectionMode)) {
+//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
+//        } else if ("C".equalsIgnoreCase(protectionMode)) {
+//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
+//        } else if ("S".equalsIgnoreCase(protectionMode)) {
+//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
+//        } else if ("E".equalsIgnoreCase(protectionMode)) {
+//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
+//        }
+////        String keyStore = options.get(KEY_STORE);
+////        if (keyStore != null) {
+////            configBuilder.setKeyStore(opts, keyStore);
+////        }
+////        String trustStore = options.get(TRUST_STORE);
+////        if (trustStore != null) {
+////            configBuilder.setTrustStore(opts, trustStore);
+////        }
+////        String keyStorePassword = options.get(KS_PASSWD);
+////        if (keyStorePassword != null) {
+////            configBuilder.setKeyStorePW(opts, keyStorePassword);
+////        }
+////        String trustStorePassword = options.get(TS_PASSWD);
+////        if (trustStorePassword != null) {
+////            configBuilder.setTrustStorePW(opts, trustStorePassword);
+////        }
+////        String keyPassword = options.get(KEY_PASSWD);
+////        if (keyPassword != null) {
+////            configBuilder.setKeyPW(opts, keyPassword);
+////        }
+//
+//        if (options.get(org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE) != null) {
+//            delegate.setConfigString(opts, options.get(
+//                            org.apache.synapse.commons.vfs.VFSConstants.SCHEME), org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE,
+//                    options.get(VFSConstants.FILE_TYPE));
+//        }
+//
+////        Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
+////
+////        boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
+////        if (options.get(ENCRYPTION_ENABLED) != null) {
+////            smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
+////        }
+////
+////        String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
+////        if (diskfileshare != null) {
+////            smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
+////        }
+//
+//        return opts;
+//    }
 
     /**
      * Function to resolve hostname of the vfs uri
@@ -299,28 +302,6 @@ public class Utils {
         return null;
     }
 
-//    =============================REMOVE===============
-//    TODO: remove it after syncing the commons-vfs fork and use that instead
-    public static Map<String, String> extractQueryParams(String uri) throws FileSystemException {
-        Map<String, String> sQueryParams = new HashMap();
-        if (uri != null) {
-            String[] urlParts = uri.split("\\?");
-            if (urlParts.length > 1) {
-                String query = urlParts[1];
-                query = decode(query);
-
-                for(String param : query.split("&")) {
-                    String[] pair = param.split("=");
-                    if (pair.length > 1) {
-                        sQueryParams.put(pair[0], pair[1]);
-                    }
-                }
-            }
-        }
-
-        return sQueryParams;
-    }
-
     public static String decode(String encodedStr) throws FileSystemException {
         if (encodedStr == null) {
             return null;
@@ -374,12 +355,12 @@ public class Utils {
         return parts.length == 1 ? parts[0] : parts[0] + "?" + parts[1];
     }
 
-    public static Action getActionAfterProcess(VFSConfig vfsConfig, int actionAfterProcess) {
+    public static Action getActionAfterProcess(VFSConfig vfsConfig, int actionAfterProcess, String targetLocation) {
         switch (actionAfterProcess) {
             case VFSConfig.DELETE:
                 return new DeleteAction();
             case VFSConfig.MOVE:
-                return new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig);
+                return new MoveAction(targetLocation, vfsConfig);
             default:
                 return null;
         }
@@ -503,8 +484,7 @@ public class Utils {
 
     public static synchronized void addFailedRecord(VFSConfig vfsConfig,
                                                     FileObject failedObject,
-                                                    String timeString) {
-//        String serviceName = vfsConfig.getServiceName();
+                                                    String timeString, FileSystemManager fsManager) {
         try {
             String record = failedObject.getName().getBaseName() + VFSConstants.FAILED_RECORD_DELIMITER
                     + timeString;
@@ -529,6 +509,7 @@ public class Utils {
         } catch (IOException e) {
             VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.FATAL,
                     "Failure while writing the failed records!", e);
+            VFSUtils.markFailRecord(fsManager, failedObject);
         }
     }
 
@@ -577,4 +558,140 @@ public class Utils {
 
         return fullPath;
     }
+
+    public static FileSystemOptions attachFileSystemOptions(Map<String, String> options, FileSystemManager fsManager) throws FileSystemException {
+        if (options == null) {
+            return null;
+        } else {
+            FileSystemOptions opts = new FileSystemOptions();
+            DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
+            Iterator var4 = options.entrySet().iterator();
+
+            while(var4.hasNext()) {
+                Map.Entry<String, String> entry = (Map.Entry)var4.next();
+                VFSConstants.SFTP_FILE_OPTION[] var6 = VFSConstants.SFTP_FILE_OPTION.values();
+                int var7 = var6.length;
+
+                for(int var8 = 0; var8 < var7; ++var8) {
+                    VFSConstants.SFTP_FILE_OPTION option = var6[var8];
+                    if (((String)entry.getKey()).equals(option.toString()) && entry.getValue() != null) {
+                        delegate.setConfigString(opts, "sftp", ((String)entry.getKey()).toLowerCase(), (String)entry.getValue());
+                    }
+                }
+            }
+
+            FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
+            String passiveMode = (String)options.get("vfs.passive");
+            if (passiveMode != null) {
+                configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
+            }
+
+            String implicitMode = (String)options.get("vfs.implicit");
+            if (implicitMode != null) {
+                if (Boolean.parseBoolean(implicitMode)) {
+                    configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
+                } else {
+                    configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
+                }
+            }
+
+            String protectionMode = (String)options.get("vfs.protection");
+            if ("P".equalsIgnoreCase(protectionMode)) {
+                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
+            } else if ("C".equalsIgnoreCase(protectionMode)) {
+                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
+            } else if ("S".equalsIgnoreCase(protectionMode)) {
+                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
+            } else if ("E".equalsIgnoreCase(protectionMode)) {
+                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
+            }
+
+            String keyStore = (String)options.get("vfs.ssl.keystore");
+            if (keyStore != null) {
+                configBuilder.setKeyStore(opts, keyStore);
+            }
+
+            String trustStore = (String)options.get("vfs.ssl.truststore");
+            if (trustStore != null) {
+                configBuilder.setTrustStore(opts, trustStore);
+            }
+
+            String keyStorePassword = (String)options.get("vfs.ssl.kspassword");
+            if (keyStorePassword != null) {
+                configBuilder.setKeyStorePW(opts, keyStorePassword);
+            }
+
+            String trustStorePassword = (String)options.get("vfs.ssl.tspassword");
+            if (trustStorePassword != null) {
+                configBuilder.setTrustStorePW(opts, trustStorePassword);
+            }
+
+            String keyPassword = (String)options.get("vfs.ssl.keypassword");
+            if (keyPassword != null) {
+                configBuilder.setKeyPW(opts, keyPassword);
+            }
+
+            if (options.get("filetype") != null) {
+                delegate.setConfigString(opts, (String)options.get("VFS_SCHEME"), "filetype", (String)options.get("filetype"));
+            }
+
+            return opts;
+        }
+    }
+
+    public static boolean isFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
+        try {
+            String fullPath = fo.getName().getURI();
+            String queryParams = "";
+            int pos = fullPath.indexOf(63);
+            if (pos > -1) {
+                queryParams = fullPath.substring(pos);
+                fullPath = fullPath.substring(0, pos);
+            }
+
+            FileObject failObject = fsManager.resolveFile(fullPath + ".fail" + queryParams, fso);
+            if (failObject.exists()) {
+                return true;
+            }
+        } catch (FileSystemException var7) {
+            log.error("Couldn't release the fail for the file : " + maskURLPassword(fo.getName().getURI()));
+        }
+
+        return false;
+    }
+
+    public static boolean isFailedRecordInFailedList(FileObject fileObject, VFSConfig entry) {
+        String failedFile = entry.getFailedRecordFileDestination() +
+                entry.getFailedRecordFileName();
+        File file = new File(failedFile);
+        if (file.exists()) {
+            try {
+                List list = FileUtils.readLines(file);
+                for (Object aList : list) {
+                    String str = (String) aList;
+                    StringTokenizer st = new StringTokenizer(str,
+                            org.wso2.carbon.inbound.vfs.VFSConstants.FAILED_RECORD_DELIMITER);
+                    String fileName = st.nextToken();
+                    if (fileName != null &&
+                            fileName.equals(fileObject.getName().getBaseName())) {
+                        return true;
+                    }
+                }
+            } catch (IOException e) {
+                log.fatal("Error while reading the file '"
+                        + Utils.maskURLPassword(failedFile) + "'", e);
+            }
+        }
+        return false;
+    }
+
+
+    public static String extractPath(String uri) {
+        int queryIndex = uri.indexOf('?');
+        if (queryIndex != -1) {
+            return uri.substring(0, queryIndex);
+        }
+        return uri; // no parameters
+    }
+
 }

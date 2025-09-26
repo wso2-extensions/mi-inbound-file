@@ -33,10 +33,13 @@ import org.apache.synapse.commons.crypto.CryptoUtil;
 import java.net.UnknownHostException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
 
 /**
  * Holds information about an entry in the VFS transport poll table used by the
@@ -296,6 +299,17 @@ public class VFSConfig {
                         properties.getProperty("30000"));
                 log.warn("Invalid failedRecordNextRetryDuration value: " + retryDurationStr +
                         ". Using default: " + failedRecordNextRetryDuration);
+            }
+        }
+
+        try {
+            this.vfsSchemeProperties = extractQueryParams(this.fileURI);
+            vfsSchemeProperties.putAll(extractQueryParams(this.replyFileURI));
+            vfsSchemeProperties.putAll(extractQueryParams(this.moveAfterProcess));
+        } catch (FileSystemException e) {
+            this.vfsSchemeProperties = new HashMap<>();
+            if (log.isDebugEnabled()) {
+                log.debug("Error extracting query params from URI: " + Utils.maskURLPassword(this.fileURI), e);
             }
         }
     }

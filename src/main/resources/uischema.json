@@ -106,7 +106,7 @@
               "helpTip": "The interval for the connection.",
               "enableCondition": [
                 {
-                  "authType": "Polling"
+                  "scheduleType": "Polling"
                 }
               ]
             }
@@ -122,19 +122,9 @@
               "helpTip": "The cron for the connection.",
               "enableCondition": [
                 {
-                  "authType": "cron"
+                  "scheduleType": "Cron"
                 }
               ]
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "cronExpression",
-              "displayName": "Cron-Expression",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "true"
             }
           },
           {
@@ -178,7 +168,7 @@
               "name": "transport.vfs.FileProcessCount",
               "displayName": "File Process Count",
               "inputType": "string",
-              "defaultValue": "1",
+              "defaultValue": "",
               "required": "false",
               "helpTip": "Maximum number of files to process in a single polling cycle.",
               "enableCondition": [
@@ -276,17 +266,12 @@
               "displayName": "Move After Process",
               "inputType": "string",
               "defaultValue": "",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.MoveAfterFailure",
-              "displayName": "Move After Failure",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterProcess": "MOVE"
+                }
+              ]
             }
           },
           {
@@ -296,14 +281,19 @@
               "displayName": "Move Timestamp Format",
               "inputType": "string",
               "defaultValue": "",
-              "required": "false"
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterProcess": "MOVE"
+                }
+              ]
             }
           },
           {
             "type": "attribute",
             "value": {
               "name": "transport.vfs.ActionAfterFailure",
-              "displayName": "Action After Failure",
+              "displayName": "Action After Process Failure",
               "inputType": "combo",
               "comboValues": [
                 "DELETE",
@@ -317,10 +307,60 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.MoveAfterFailedMove",
-              "displayName": "Move After Failed Move",
+              "name": "transport.vfs.MoveAfterFailure",
+              "displayName": "Move After Failure",
               "inputType": "string",
               "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterFailure": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordsFileName",
+              "displayName": "Failed Records File Name",
+              "inputType": "string",
+              "defaultValue": "vfs-move-failed-records.properties",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordsFileDestination",
+              "displayName": "Failed Records File Destination",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterFailedMove",
+              "displayName": "Secondary Fallback Destination",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterFailure": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveFailedRecordTimestampFormat",
+              "displayName": "Move Failed Record Timestamp Format",
+              "inputType": "string",
+              "defaultValue": "dd-MM-yyyy HH:mm:ss",
               "required": "false"
             }
           }
@@ -356,46 +396,6 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.LockReleaseSameNode",
-              "displayName": "Lock Release Same Node",
-              "inputType": "checkbox",
-              "defaultValue": false,
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.FailedRecordsFileName",
-              "displayName": "Failed Records File Name",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.FailedRecordsFileDestination",
-              "displayName": "Failed Records File Destination",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.MoveFailedRecordTimestampFormat",
-              "displayName": "Move Failed Record Timestamp Format",
-              "inputType": "string",
-              "defaultValue": "dd-MM-yyyy HH:mm:ss",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
               "name": "transport.vfs.FailedRecordNextRetryDuration",
               "displayName": "Failed Record Next Retry Duration",
               "inputType": "string",
@@ -406,11 +406,30 @@
           {
             "type": "attribute",
             "value": {
+              "name": "transport.vfs.Locking",
+              "displayName": "Locking",
+              "inputType": "combo",
+              "comboValues": [
+                "enable",
+                "disable"
+              ],
+              "defaultValue": "enable",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "transport.vfs.AutoLockRelease",
               "displayName": "Auto Lock Release",
               "inputType": "checkbox",
               "defaultValue": false,
-              "required": "false"
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.Locking": "enable"
+                }
+              ]
             }
           },
           {
@@ -420,7 +439,7 @@
               "displayName": "Auto Lock Release Interval",
               "inputType": "string",
               "required": "true",
-              "defaultValue": "15000",
+              "defaultValue": "",
               "enableCondition": [
                 {
                   "transport.vfs.AutoLockRelease": true
@@ -435,7 +454,7 @@
               "displayName": "Auto Lock Release Same Node",
               "inputType": "checkbox",
               "defaultValue": false,
-              "required": "true",
+              "required": "",
               "enableCondition": [
                 {
                   "transport.vfs.AutoLockRelease": true
@@ -521,16 +540,6 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.CreateFolder",
-              "displayName": "Create Folder",
-              "inputType": "checkbox",
-              "defaultValue": false,
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
               "name": "transport.vfs.Streaming",
               "displayName": "Streaming",
               "inputType": "checkbox",
@@ -555,45 +564,6 @@
               "displayName": "Update Last Modified",
               "inputType": "checkbox",
               "defaultValue": true,
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.DistributedLock",
-              "displayName": "Distributed Lock",
-              "inputType": "checkbox",
-              "defaultValue": false,
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.DistributedTimeout",
-              "displayName": "Distributed Timeout",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "true",
-              "enableCondition": [
-                {
-                  "transport.vfs.DistributedLock": true
-                }
-              ]
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.Locking",
-              "displayName": "Locking",
-              "inputType": "combo",
-              "comboValues": [
-                "enable",
-                "disable"
-              ],
-              "defaultValue": "enable",
               "required": "false"
             }
           }

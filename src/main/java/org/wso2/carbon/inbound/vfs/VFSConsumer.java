@@ -1,5 +1,6 @@
 package org.wso2.carbon.inbound.vfs;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -11,6 +12,7 @@ import org.apache.commons.vfs2.FileSystemOptions;
 import org.apache.commons.vfs2.FileType;
 import org.apache.commons.vfs2.impl.StandardFileSystemManager;
 import org.apache.commons.vfs2.provider.UriParser;
+import org.apache.synapse.commons.vfs.VFSUtils;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import org.wso2.carbon.inbound.vfs.filter.FileSelector;
@@ -19,17 +21,22 @@ import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 import org.wso2.carbon.inbound.vfs.processor.PostProcessingHandler;
 import org.wso2.carbon.inbound.vfs.processor.PreProcessingHandler;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.StringTokenizer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
 import static org.apache.synapse.commons.vfs.VFSUtils.*;
 
 public class VFSConsumer extends GenericPollingConsumer {
@@ -49,15 +56,7 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     private boolean readSubDirectories = false;
     private final String name;
-
-    // File locking related fields
-    private boolean autoLockRelease;
-    private Boolean autoLockReleaseSameNode;
-    private Long autoLockReleaseInterval;
-    private boolean distributedLock;
-    private Long distributedLockTimeout;
     private boolean isClosed;
-
     private String replyFileURI;
     private String replyFileName;
     private boolean append = false;
@@ -66,6 +65,7 @@ public class VFSConsumer extends GenericPollingConsumer {
     private boolean passive = false;
     private Long failedRecordNextRetryDuration = 30000L; // Default 30 seconds
     private final ScheduledExecutorService retryScheduler;
+    private boolean isMounted = false;
 
     public VFSConsumer(Properties properties,
                        String name,
@@ -91,9 +91,6 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Build FSO once per poll (protocol options; auth; SFTP opts; etc.)
         this.fso = null;
 
-        // Initialize file locking parameters
-        initializeFileLockingParams();
-
         // Initialize new features
         initializeProperties();
 
@@ -105,10 +102,8 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.preProcessingHandler = new PreProcessingHandler();
         this.postProcessingHandler = new PostProcessingHandler();
         int actionAfterProcess = vfsConfig.getActionAfterProcess();
-        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess));
-        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure()));
-        this.postProcessingHandler.setOnFailActionFailAction(new MoveAction(vfsConfig.getMoveAfterFailure(), vfsConfig));
-        this.postProcessingHandler.setOnSuccessActionFailAction(new MoveAction(vfsConfig.getMoveAfterMoveFailure(), vfsConfig));
+        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess, vfsConfig.getMoveAfterProcess()));
+        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure() ));
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
@@ -137,9 +132,6 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         this.fso = null;
 
-        // Initialize file locking parameters
-        initializeFileLockingParams();
-
         // Initialize new features
         initializeProperties();
 
@@ -151,36 +143,13 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.preProcessingHandler = new PreProcessingHandler();
         this.postProcessingHandler = new PostProcessingHandler();
         int actionAfterProcess = vfsConfig.getActionAfterProcess();
-        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess));
-        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure()));
-        this.postProcessingHandler.setOnFailActionFailAction(new MoveAction(vfsConfig.getMoveAfterFailure(), vfsConfig));
-        this.postProcessingHandler.setOnSuccessActionFailAction(new MoveAction(vfsConfig.getMoveAfterMoveFailure(), vfsConfig));
+        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess,
+                vfsConfig.getMoveAfterProcess()));
+        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig,
+                vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure() ));
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
-    }
-
-    /**
-     * Initialize file locking related parameters from properties
-     */
-    private void initializeFileLockingParams() {
-        // Check if file locking is enabled
-        fileLock = vfsConfig.isFileLocking();
-        // Cluster-aware locking requires distributed locking
-        boolean clusterAware = vfsConfig.isClusterAware();
-
-        // Auto lock release configuration
-        autoLockRelease = vfsConfig.isAutoLockRelease();
-        if (autoLockRelease) {
-            autoLockReleaseInterval = vfsConfig.getAutoLockReleaseInterval();
-            autoLockReleaseSameNode = vfsConfig.getAutoLockReleaseSameNode();
-        }
-
-        // Distributed lock configuration
-        distributedLock = vfsConfig.isDistributedLock();
-        if (distributedLock) {
-            distributedLockTimeout = vfsConfig.getDistributedLockTimeout();
-        }
     }
 
     /**
@@ -201,19 +170,13 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.avoidPermissionCheck = vfsConfig.isAvoidPermissionCheck();
 
         // Passive mode for FTP
-        this.passive = vfsConfig.isPassive();
+//        this.passive = vfsConfig.isPassive();
 
         // Failed record retry duration
         this.failedRecordNextRetryDuration = vfsConfig.getFailedRecordNextRetryDuration();
 
         if (log.isDebugEnabled()) {
-            log.debug("VFS Consumer initialized with features - " +
-                    "Reply URI: " + maskURLPassword(replyFileURI) +
-                    ", Append: " + append +
-                    ", Resolve Hosts: " + resolveHostsDynamically +
-                    ", Avoid Permission Check: " + avoidPermissionCheck +
-                    ", Passive: " + passive +
-                    ", Retry Duration: " + failedRecordNextRetryDuration);
+            log.debug("VFS Consumer initialized with features" );
         }
     }
 
@@ -240,16 +203,16 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         try {
             // Attach per-scheme options (SFTP, FTP, SMB, etc.)
-            fso = attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
+            fso = Utils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
 
-            // Apply passive mode for FTP if enabled
-            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
-                if (fso == null) {
-                    fso = new FileSystemOptions();
-                }
-                // Add passive mode configuration to FSO
-                applyPassiveMode(fso);
-            }
+//            // Apply passive mode for FTP if enabled
+//            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
+//                if (fso == null) {
+//                    fso = new FileSystemOptions();
+//                }
+//                // Add passive mode configuration to FSO
+//                applyPassiveMode(fso);
+//            }
 
         } catch (Exception e) {
             log.warn("Unable to attach scheme options for: " + maskURLPassword(fileURI), e);
@@ -330,8 +293,9 @@ public class VFSConsumer extends GenericPollingConsumer {
                     continue;
                 }
 
+
                 // Check if this is a failed record
-                boolean isFailedRecord = isFailRecord(fsManager, child, fso);
+                boolean isFailedRecord = Utils.isFailRecord(fsManager, child, fso) || Utils.isFailedRecordInFailedList(child, vfsConfig);
                 if (isFailedRecord) {
                     // Handle failed record with retry mechanism
                     scheduleFailedRecordRetry(child);
@@ -348,7 +312,7 @@ public class VFSConsumer extends GenericPollingConsumer {
                     }
                 } else if (child.getType() == FileType.FILE) {
                     processCount++;
-                    if (vfsConfig.getFileProcessingInterval() != 0) {
+                    if (vfsConfig.getFileProcessingInterval() != null && vfsConfig.getFileProcessingInterval() != 0) {
                         // Throttle file processing if configured
                         try {
                             processFile(child);
@@ -398,7 +362,7 @@ public class VFSConsumer extends GenericPollingConsumer {
             }
             return;
         }
-
+        file.setIsMounted(vfsConfig.isFileLocking());
         // Delegate readiness, age, size, pattern, etc. to FileSelector
         if (!fileSelector.isValidFile(file)) {
             if (log.isDebugEnabled()) {
@@ -408,10 +372,8 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         // Acquire lock if file locking is enabled
-        LockManager lockManager = new LockManager(fileLock, autoLockRelease,
-                autoLockReleaseSameNode, autoLockReleaseInterval,
-                distributedLock,
-                fsManager, fso, distributedLockTimeout, vfsConfig.isClusterAware());
+        LockManager lockManager = new LockManager(fileLock, vfsConfig,
+                fsManager, fso, vfsConfig.isClusterAware());
 
         if (fileLock && !lockManager.acquireLock(file)) {
             log.error("Couldn't get the lock for processing the file: " +
@@ -419,7 +381,6 @@ public class VFSConsumer extends GenericPollingConsumer {
             return;
         }
 
-        boolean processSuccessful = false;
         boolean skipUnlock = false;
 
         try {
@@ -460,13 +421,13 @@ public class VFSConsumer extends GenericPollingConsumer {
 
                 boolean ok = fileInjectHandler.invoke(file, name);
                 if (ok) {
-                    processSuccessful = true;
+
                     postProcessingHandler.onSuccess(file);
                 } else {
                     // handle the failed records here too
                     String timeStamp =
                             Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
-                    Utils.addFailedRecord(vfsConfig, file, timeStamp);
+                    Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
                     postProcessingHandler.onFail(file);
                 }
             }
@@ -475,7 +436,7 @@ public class VFSConsumer extends GenericPollingConsumer {
             try {
                 String timeStamp =
                         Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
-                Utils.addFailedRecord(vfsConfig, file, timeStamp);
+                Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
                 postProcessingHandler.onFail(file);
             } catch (Exception failHandlingError) {
                 log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
@@ -552,8 +513,12 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (log.isDebugEnabled()) {
             log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
         }
-        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterFailure(), vfsConfig);
-        moveAction.execute(file);
+        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig);
+        try {
+            moveAction.execute(file);
+        } catch (FileSystemException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -723,7 +688,8 @@ public class VFSConsumer extends GenericPollingConsumer {
                 }
                 // TODO: Mount Get if the file location is volume mounted
                 Map<String,String> queryParams = UriParser.extractQueryParams(fileURI);
-                fileObject.setIsMounted(Boolean.parseBoolean(queryParams.get(VFSConstants.IS_MOUNTED)));
+                isMounted = Boolean.parseBoolean(queryParams.get(VFSConstants.IS_MOUNTED));
+                fileObject.setIsMounted(isMounted);
                 wasError = false;
             } catch (FileSystemException e) {
                 if (retryCount >= vfsConfig.getMaxRetryCount()) {
@@ -770,5 +736,6 @@ public class VFSConsumer extends GenericPollingConsumer {
         fsManager.close();
         this.close();
     }
+
 }
 
