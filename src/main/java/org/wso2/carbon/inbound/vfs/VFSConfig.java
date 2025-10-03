@@ -19,16 +19,13 @@
 package org.wso2.carbon.inbound.vfs;
 
 import org.apache.axis2.AxisFault;
-import org.apache.axis2.addressing.EndpointReference;
-import org.apache.axis2.description.AxisService;
 import org.apache.axis2.description.Parameter;
 import org.apache.axis2.description.ParameterInclude;
-import org.apache.axis2.transport.base.ParamUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileSystemException;
 import org.apache.synapse.commons.crypto.CryptoUtil;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
 
 import java.net.UnknownHostException;
 import java.text.DateFormat;
@@ -39,7 +36,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
+import static org.wso2.org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
 
 /**
  * Holds information about an entry in the VFS transport poll table used by the
@@ -304,8 +301,6 @@ public class VFSConfig {
 
         try {
             this.vfsSchemeProperties = extractQueryParams(this.fileURI);
-            vfsSchemeProperties.putAll(extractQueryParams(this.replyFileURI));
-            vfsSchemeProperties.putAll(extractQueryParams(this.moveAfterProcess));
         } catch (FileSystemException e) {
             this.vfsSchemeProperties = new HashMap<>();
             if (log.isDebugEnabled()) {

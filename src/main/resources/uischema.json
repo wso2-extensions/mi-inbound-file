@@ -202,6 +202,7 @@
               "displayName": "Reply File URI",
               "inputType": "string",
               "defaultValue": "",
+              "hidden": "true",
               "required": "false"
             }
           },
@@ -211,6 +212,7 @@
               "name": "transport.vfs.ReplyFileName",
               "displayName": "Reply File Name",
               "inputType": "string",
+              "hidden": "true",
               "defaultValue": "response.xml",
               "required": "false"
             }

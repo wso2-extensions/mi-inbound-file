@@ -1,18 +1,9 @@
 package org.wso2.carbon.inbound.vfs;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileContent;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-import org.apache.commons.vfs2.FileSystemManager;
-import org.apache.commons.vfs2.FileSystemOptions;
-import org.apache.commons.vfs2.FileType;
-import org.apache.commons.vfs2.impl.StandardFileSystemManager;
-import org.apache.commons.vfs2.provider.UriParser;
-import org.apache.synapse.commons.vfs.VFSUtils;
+
 import org.apache.synapse.core.SynapseEnvironment;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import org.wso2.carbon.inbound.vfs.filter.FileSelector;
@@ -20,9 +11,15 @@ import org.wso2.carbon.inbound.vfs.lock.LockManager;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
 import org.wso2.carbon.inbound.vfs.processor.PostProcessingHandler;
 import org.wso2.carbon.inbound.vfs.processor.PreProcessingHandler;
+import org.wso2.org.apache.commons.vfs2.FileContent;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
+import org.wso2.org.apache.commons.vfs2.FileType;
+import org.wso2.org.apache.commons.vfs2.impl.StandardFileSystemManager;
+import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -36,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
 import static org.apache.synapse.commons.vfs.VFSUtils.*;
 
 public class VFSConsumer extends GenericPollingConsumer {
@@ -98,12 +94,13 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.retryScheduler = Executors.newScheduledThreadPool(1);
 
         // Handlers (wire your concrete actions here)
-        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, vfsConfig);
+        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment,
+                vfsConfig);
         this.preProcessingHandler = new PreProcessingHandler();
         this.postProcessingHandler = new PostProcessingHandler();
         int actionAfterProcess = vfsConfig.getActionAfterProcess();
-        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess, vfsConfig.getMoveAfterProcess()));
-        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure() ));
+        this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess, vfsConfig.getMoveAfterProcess(), fsManager));
+        this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig, vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure(), fsManager));
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
@@ -139,14 +136,15 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.retryScheduler = Executors.newScheduledThreadPool(1);
 
         // Handlers (wire your concrete actions here)
-        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment, vfsConfig);
+        this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment,
+                vfsConfig);
         this.preProcessingHandler = new PreProcessingHandler();
         this.postProcessingHandler = new PostProcessingHandler();
         int actionAfterProcess = vfsConfig.getActionAfterProcess();
         this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess,
-                vfsConfig.getMoveAfterProcess()));
+                vfsConfig.getMoveAfterProcess(),fsManager));
         this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig,
-                vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure() ));
+                vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure(),fsManager));
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
@@ -160,17 +158,9 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Reply file configuration
         this.replyFileURI = vfsConfig.getReplyFileURI();
         this.replyFileName = vfsConfig.getReplayFileName();
-        // Append mode for writing files
-        this.append = vfsConfig.isAppend();
 
         // Resolve hosts dynamically
         this.resolveHostsDynamically = vfsConfig.isResolveHostsDynamically();
-
-        // TODO: Avoid permission check
-        this.avoidPermissionCheck = vfsConfig.isAvoidPermissionCheck();
-
-        // Passive mode for FTP
-//        this.passive = vfsConfig.isPassive();
 
         // Failed record retry duration
         this.failedRecordNextRetryDuration = vfsConfig.getFailedRecordNextRetryDuration();
@@ -205,14 +195,14 @@ public class VFSConsumer extends GenericPollingConsumer {
             // Attach per-scheme options (SFTP, FTP, SMB, etc.)
             fso = Utils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
 
-//            // Apply passive mode for FTP if enabled
-//            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
-//                if (fso == null) {
-//                    fso = new FileSystemOptions();
-//                }
-//                // Add passive mode configuration to FSO
-//                applyPassiveMode(fso);
-//            }
+            // Apply passive mode for FTP if enabled
+            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
+                if (fso == null) {
+                    fso = new FileSystemOptions();
+                }
+                // Add passive mode configuration to FSO
+                applyPassiveMode(fso);
+            }
 
         } catch (Exception e) {
             log.warn("Unable to attach scheme options for: " + maskURLPassword(fileURI), e);
@@ -421,7 +411,6 @@ public class VFSConsumer extends GenericPollingConsumer {
 
                 boolean ok = fileInjectHandler.invoke(file, name);
                 if (ok) {
-
                     postProcessingHandler.onSuccess(file);
                 } else {
                     // handle the failed records here too
@@ -441,13 +430,13 @@ public class VFSConsumer extends GenericPollingConsumer {
             } catch (Exception failHandlingError) {
                 log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
                 // Mark as failed record if we couldn't handle the failure
-                markFailRecord(fsManager, file, fso);
+                Utils.markFailRecord(fsManager, file, fso);
                 skipUnlock = true;
             }
         } finally {
             // Release lock if file locking is enabled and we shouldn't skip
             if (fileLock && !skipUnlock) {
-                releaseLock(fsManager, file, fso);
+                Utils.releaseLock(fsManager, file, fso);
                 if (log.isDebugEnabled()) {
                     log.debug("Released the lock for file: " + maskURLPassword(file.toString()));
                 }
@@ -513,7 +502,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (log.isDebugEnabled()) {
             log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
         }
-        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig);
+        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig, fsManager);
         try {
             moveAction.execute(file);
         } catch (FileSystemException e) {

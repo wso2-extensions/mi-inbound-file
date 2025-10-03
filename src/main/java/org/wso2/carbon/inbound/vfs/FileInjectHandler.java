@@ -32,25 +32,19 @@ import org.apache.commons.io.input.AutoCloseInputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
 import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
-import org.apache.synapse.commons.vfs.FileObjectDataSource;
 import org.apache.synapse.commons.vfs.VFSConstants;
 import org.apache.synapse.commons.vfs.VFSOutTransportInfo;
 import org.apache.synapse.core.SynapseEnvironment;
-import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.apache.synapse.inbound.InboundEndpoint;
-import org.apache.synapse.inbound.InboundEndpointConstants;
 import org.apache.synapse.mediators.base.SequenceMediator;
 import org.apache.synapse.transport.customlogsetter.CustomLogSetter;
-import org.wso2.carbon.inbound.endpoint.inboundfactory.InboundRequestProcessorFactoryImpl;
+import org.wso2.org.apache.commons.vfs2.FileObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
 import javax.mail.internet.ContentType;
 import javax.mail.internet.ParseException;
@@ -176,18 +170,28 @@ public class FileInjectHandler {
                     seq.init(synapseEnvironment);
                 }
                 seq.setErrorHandler(onErrorSeq);
-//                if (!synapseEnvironment.injectInbound(msgCtx, seq, sequential)) {
-//                    return false;
-//                }
+
+                // >>> APPEND MODE: ensure any VFS write/Respond appends instead of overwriting
+                // This sets the Axis2 property the VFS sender/transport checks.
+                if (vfsProperties.isAppend()) {
+                    axis2MsgCtx.setProperty("transport.vfs.Append", "true");
+                }
+                // Optional (config-driven): if you later add a boolean to VFSConfig, do:
+                // axis2MsgCtx.setProperty("transport.vfs.Append",
+                //     String.valueOf(vfsProperties.isAppendEnabled()));
+                // <<< APPEND MODE
+
                 synapseEnvironment.injectInbound(msgCtx, seq, sequential);
-//                MessageContext axis2MessageContext = ((Axis2MessageContext) msgCtx).getAxis2MessageContext();
-                Map<String, Object> transportHeaders = (Map<String, Object>) axis2MsgCtx.getProperty(TRANSPORT_HEADERS);
-                String errorCode = (String) transportHeaders.get(VFSConstants.ERROR_CODE);
+
+                Map<String, Object> transportHeaders =
+                        (Map<String, Object>) axis2MsgCtx.getProperty(TRANSPORT_HEADERS);
+                String errorCode = (transportHeaders != null)
+                        ? (String) transportHeaders.get(VFSConstants.ERROR_CODE) : null;
                 if (StringUtils.isNotEmpty(errorCode)) {
                     return false;
                 }
                 /// set rollback property check = -1
-                ///wrtie body of message.
+                /// write body of message.
             } else {
                 log.error("Sequence: " + injectingSeq + " not found");
             }
@@ -219,7 +223,6 @@ public class FileInjectHandler {
     }
 
     public void setFileURI(String fileURI) {
-
         this.fileURI = fileURI;
     }
 
@@ -227,7 +230,6 @@ public class FileInjectHandler {
      * Create the initial message context for the file
      */
     private org.apache.synapse.MessageContext createMessageContext() {
-
         org.apache.synapse.MessageContext msgCtx = synapseEnvironment.createMessageContext();
         MessageContext axis2MsgCtx = ((org.apache.synapse.core.axis2.Axis2MessageContext) msgCtx)
                 .getAxis2MessageContext();
@@ -238,4 +240,3 @@ public class FileInjectHandler {
         return msgCtx;
     }
 }
-

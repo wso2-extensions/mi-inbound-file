@@ -1,16 +1,15 @@
 package org.wso2.carbon.inbound.vfs.filter;
 
 
-import org.apache.commons.vfs2.FileObject;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.apache.commons.vfs2.FileSystemManager;
 import org.wso2.carbon.inbound.vfs.Utils;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 
 import java.io.InputStream;
-import java.nio.file.FileSystemException;
 import java.security.MessageDigest;
 
 public class SizeCheckFilter implements Filter {

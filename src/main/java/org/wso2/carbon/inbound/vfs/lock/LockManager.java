@@ -2,14 +2,14 @@ package org.wso2.carbon.inbound.vfs.lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-import org.apache.commons.vfs2.FileSystemManager;
-import org.apache.commons.vfs2.FileSystemOptions;
-import org.apache.commons.vfs2.impl.DefaultFileSystemManager;
 import org.apache.synapse.commons.vfs.VFSParamDTO;
 import org.wso2.carbon.inbound.vfs.Utils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
+import org.wso2.org.apache.commons.vfs2.impl.DefaultFileSystemManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,13 +31,13 @@ public class LockManager {
     private boolean autoLockRelease;
     private boolean autoLockReleaseSameNode;
     private long autoLockReleaseInterval;
-    private final org.apache.commons.vfs2.FileSystemManager fsManager;
-    private final org.apache.commons.vfs2.FileSystemOptions fso;
+    private final FileSystemManager fsManager;
+    private final FileSystemOptions fso;
     private final boolean clusterWare;
 
     public LockManager(boolean fileLock, VFSConfig vfsConfig,
-                       org.apache.commons.vfs2.FileSystemManager fsManager,
-                       org.apache.commons.vfs2.FileSystemOptions fso,
+                       FileSystemManager fsManager,
+                       FileSystemOptions fso,
                        boolean clusterWare) {
         this.fileLock = fileLock;
         initializeFileLockingParams(vfsConfig);

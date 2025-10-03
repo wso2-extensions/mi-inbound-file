@@ -1,7 +1,7 @@
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.apache.commons.vfs2.FileObject;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
+import org.wso2.org.apache.commons.vfs2.FileObject;
 
 public class SizeFilter implements Filter{
     VFSConfig vfsConfig;

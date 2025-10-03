@@ -2,11 +2,11 @@ package org.wso2.carbon.inbound.vfs.filter;
 
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 
-import org.apache.commons.vfs2.FileObject;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.logging.Log;
-import org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 
 public class FileSelector {
 

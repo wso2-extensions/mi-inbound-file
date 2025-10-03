@@ -24,10 +24,10 @@
             <source>src/main/resources/connector.xml</source>
             <outputDirectory>/</outputDirectory>
         </file>
-<!--        <file>-->
-<!--            <source>src/main/resources/descriptor.yml</source>-->
-<!--            <outputDirectory>/</outputDirectory>-->
-<!--            <filtered>true</filtered>-->
-<!--        </file>-->
+        <file>
+            <source>src/main/resources/descriptor.yml</source>
+            <outputDirectory>/</outputDirectory>
+            <filtered>true</filtered>
+        </file>
     </files>
 </assembly>

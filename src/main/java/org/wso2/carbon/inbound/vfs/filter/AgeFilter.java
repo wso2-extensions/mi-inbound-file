@@ -2,10 +2,9 @@ package org.wso2.carbon.inbound.vfs.filter;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.wso2.carbon.inbound.vfs.processor.MoveAction;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
 
 public class AgeFilter implements Filter {
     private Log log = LogFactory.getLog(AgeFilter.class);

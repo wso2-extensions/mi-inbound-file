@@ -3,20 +3,20 @@ package org.wso2.carbon.inbound.vfs;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-import org.apache.commons.vfs2.FileSystemManager;
-import org.apache.commons.vfs2.FileSystemOptions;
-import org.apache.commons.vfs2.provider.UriParser;
-import org.apache.commons.vfs2.provider.ftps.FtpsDataChannelProtectionLevel;
-import org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
-import org.apache.commons.vfs2.provider.ftps.FtpsMode;
-import org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 import org.apache.synapse.commons.vfs.VFSConstants;
-import org.apache.synapse.commons.vfs.VFSUtils;
 import org.wso2.carbon.inbound.vfs.processor.Action;
 import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
+import org.wso2.org.apache.commons.vfs2.impl.DefaultFileSystemManager;
+import org.wso2.org.apache.commons.vfs2.provider.UriParser;
+import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsDataChannelProtectionLevel;
+import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
+import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsMode;
+import org.wso2.org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 
 import java.io.File;
 import java.io.IOException;
@@ -355,12 +355,12 @@ public class Utils {
         return parts.length == 1 ? parts[0] : parts[0] + "?" + parts[1];
     }
 
-    public static Action getActionAfterProcess(VFSConfig vfsConfig, int actionAfterProcess, String targetLocation) {
+    public static Action getActionAfterProcess(VFSConfig vfsConfig, int actionAfterProcess, String targetLocation, FileSystemManager fsManager) {
         switch (actionAfterProcess) {
             case VFSConfig.DELETE:
                 return new DeleteAction();
             case VFSConfig.MOVE:
-                return new MoveAction(targetLocation, vfsConfig);
+                return new MoveAction(targetLocation, vfsConfig, fsManager);
             default:
                 return null;
         }
@@ -509,12 +509,16 @@ public class Utils {
         } catch (IOException e) {
             VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.FATAL,
                     "Failure while writing the failed records!", e);
-            VFSUtils.markFailRecord(fsManager, failedObject);
+            markFailRecord(fsManager, failedObject);
         }
     }
 
     public static String getSystemTime(String dateFormat) {
         return (new SimpleDateFormat(dateFormat)).format(new Date());
+    }
+
+    public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo) {
+        markFailRecord(fsManager, fo, (FileSystemOptions)null);
     }
 
     public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
@@ -685,13 +689,38 @@ public class Utils {
         return false;
     }
 
-
     public static String extractPath(String uri) {
         int queryIndex = uri.indexOf('?');
         if (queryIndex != -1) {
             return uri.substring(0, queryIndex);
         }
         return uri; // no parameters
+    }
+
+
+    public static void releaseLock(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
+        String fullPath = fo.getName().getURI();
+
+        try {
+            int pos = fullPath.indexOf(63);
+            if (pos > -1) {
+                fullPath = fullPath.substring(0, pos);
+            }
+
+            FileObject lockObject = fsManager.resolveFile(fullPath + ".lock", fso);
+            if (lockObject.exists()) {
+                lockObject.delete();
+            }
+        } catch (FileSystemException var8) {
+            log.error("Couldn't release the lock for the file : " + maskURLPassword(fo.getName().getURI()) + " after processing");
+
+            try {
+                ((DefaultFileSystemManager)fsManager).closeCachedFileSystem(fullPath + ".lock", fso);
+            } catch (Exception var7) {
+                log.warn("Unable to clear file system", var7);
+            }
+        }
+
     }
 
 }

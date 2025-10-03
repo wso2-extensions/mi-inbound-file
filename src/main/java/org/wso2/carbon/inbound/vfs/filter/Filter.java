@@ -1,7 +1,6 @@
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileObject;
 
 public interface Filter {
 

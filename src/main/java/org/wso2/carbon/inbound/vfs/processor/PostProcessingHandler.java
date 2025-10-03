@@ -1,14 +1,8 @@
 package org.wso2.carbon.inbound.vfs.processor;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.synapse.commons.vfs.VFSConstants;
-
-import java.util.Map;
-
-import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
+import org.wso2.org.apache.commons.vfs2.FileObject;
 
 public class PostProcessingHandler implements PostProcessor {
 

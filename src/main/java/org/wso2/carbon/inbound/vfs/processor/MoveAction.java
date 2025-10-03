@@ -3,26 +3,31 @@ package org.wso2.carbon.inbound.vfs.processor;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
+import org.apache.synapse.commons.vfs.VFSUtils;
 import org.wso2.carbon.inbound.vfs.Utils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.wso2.carbon.inbound.vfs.VFSConstants;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemException;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
 
 import java.text.DateFormat;
 import java.util.Map;
+import java.util.Properties;
 
-import static org.apache.commons.vfs2.provider.UriParser.extractQueryParams;
 import static org.wso2.carbon.inbound.vfs.Utils.sanitizeFileUriWithSub;
 
 public class MoveAction implements Action {
 
     String targetLocation;
     VFSConfig vfsConfig;
+    FileSystemManager fsManager;
 
-    public MoveAction(String targetLocation, VFSConfig vfsConfig) {
+    public MoveAction(String targetLocation, VFSConfig vfsConfig, FileSystemManager fsManager) {
         this.targetLocation = targetLocation;
         this.vfsConfig = vfsConfig;
+        this.fsManager = fsManager;
     }
 
     private final Log log = LogFactory.getLog(MoveAction.class);
@@ -30,6 +35,14 @@ public class MoveAction implements Action {
     @Override
     public void execute(FileObject fileObject) throws FileSystemException {
         // after success
+        FileSystemOptions destinationFSO = null;
+        Map<String, String> query = VFSUtils.parseSchemeFileOptions(targetLocation, new Properties());
+        query.putAll(vfsConfig.getVfsSchemeProperties());
+        try {
+            destinationFSO = Utils.attachFileSystemOptions(query, fsManager);
+        } catch (Exception e) {
+            log.warn("Unable to set the options for processed file location ", e);
+        }
 
         if (targetLocation != null && targetLocation.trim().length() > 0) {
             if (Utils.supportsSubDirectoryToken(targetLocation)) {
@@ -41,26 +54,25 @@ public class MoveAction implements Action {
             if (vfsConfig.getSubfolderTimestamp() != null) {
                 targetLocation = Utils.optionallyAppendDateToUri(targetLocation, vfsConfig);
             }
-            targetLocation = Utils.extractPath(targetLocation);
 
-            FileObject dest = fileObject.getFileSystem().resolveFile(targetLocation + "/" + fileObject.getName().getBaseName());
+            FileObject moveToDirectory = fsManager.resolveFile(targetLocation, destinationFSO);
+            FileObject dest = moveToDirectory.resolveFile(fileObject.getName().getBaseName());
 
-            Map<String, String> queryParams = vfsConfig.getVfsSchemeProperties();
-            if (!StringUtils.isEmpty(queryParams.get(org.wso2.carbon.inbound.vfs.VFSConstants.FORCE_CREATE_FOLDER))) {
-                String isForceCreated = queryParams.get(VFSConstants.FORCE_CREATE_FOLDER);
+            if (!StringUtils.isEmpty(query.get(org.wso2.carbon.inbound.vfs.VFSConstants.FORCE_CREATE_FOLDER))) {
+                String isForceCreated = query.get(VFSConstants.FORCE_CREATE_FOLDER);
                 if (Boolean.parseBoolean(isForceCreated)) {
                     dest.createFile();
                 }
             }
+
             if (vfsConfig.isUpdateLastModified()) {
                 dest.setUpdateLastModified(vfsConfig.isUpdateLastModified());
             }
+
             if (vfsConfig.getMoveTimestampFormat() != null) {
                 DateFormat moveTimestampFormat = vfsConfig.getMoveTimestampFormat();
-                dest = fileObject.getFileSystem().resolveFile(targetLocation + "/" + moveTimestampFormat +
-                        fileObject.getName().getBaseName());
+                dest = fileObject.resolveFile( moveTimestampFormat + "_" + fileObject.getName().getBaseName());
             }
-
 
             fileObject.moveTo(dest);
             log.info("File moved");
@@ -69,5 +81,4 @@ public class MoveAction implements Action {
             log.info("Target location not provided. Hence not moving the file");
         }
     }
-
 }
