@@ -1,5 +1,6 @@
 package org.wso2.carbon.inbound.vfs;
 
+import com.hierynomus.msdtyp.AccessMask;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -16,6 +17,7 @@ import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsDataChannelProtectionLevel;
 import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
 import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsMode;
+import org.wso2.org.apache.commons.vfs2.provider.smb2.Smb2FileSystemConfigBuilder;
 import org.wso2.org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 
 import java.io.File;
@@ -24,13 +26,16 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -94,97 +99,6 @@ public class Utils {
             return url;
         }
     }
-
-//    public static FileSystemOptions attachFileSystemOptions(Map<String, String> options, FileSystemManager fsManager)
-//            throws FileSystemException {
-//        if (options == null) {
-//            return null;
-//        }
-//
-//        FileSystemOptions opts = new FileSystemOptions();
-//        DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
-//
-//        // setting all available configs regardless of the options.get(VFSConstants.SCHEME)
-//        // because schemes of FileURI and MoveAfterProcess can be different
-//
-//        //sftp configs
-//        for (Map.Entry<String, String> entry : options.entrySet()) {
-//            for (org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION option : org.apache.synapse.commons.vfs.VFSConstants.SFTP_FILE_OPTION.values()) {
-//                if (entry.getKey().equals(option.toString()) && entry.getValue() != null) {
-//                    delegate.setConfigString(opts, org.apache.synapse.commons.vfs.VFSConstants.SCHEME_SFTP, entry.getKey().toLowerCase(),
-//                            entry.getValue());
-//                }
-//            }
-//        }
-//
-//        FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
-//
-//        // ftp and ftps configs
-//        String passiveMode = options.get(PASSIVE_MODE);
-//        if (passiveMode != null) {
-//            configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
-//        }
-//
-//        // ftps configs
-//        String implicitMode = options.get(IMPLICIT_MODE);
-//        if (implicitMode != null) {
-//            if (Boolean.parseBoolean(implicitMode)) {
-//                configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
-//            } else {
-//                configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
-//            }
-//        }
-//        String protectionMode = options.get(PROTECTION_MODE);
-//        if ("P".equalsIgnoreCase(protectionMode)) {
-//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
-//        } else if ("C".equalsIgnoreCase(protectionMode)) {
-//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
-//        } else if ("S".equalsIgnoreCase(protectionMode)) {
-//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
-//        } else if ("E".equalsIgnoreCase(protectionMode)) {
-//            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
-//        }
-////        String keyStore = options.get(KEY_STORE);
-////        if (keyStore != null) {
-////            configBuilder.setKeyStore(opts, keyStore);
-////        }
-////        String trustStore = options.get(TRUST_STORE);
-////        if (trustStore != null) {
-////            configBuilder.setTrustStore(opts, trustStore);
-////        }
-////        String keyStorePassword = options.get(KS_PASSWD);
-////        if (keyStorePassword != null) {
-////            configBuilder.setKeyStorePW(opts, keyStorePassword);
-////        }
-////        String trustStorePassword = options.get(TS_PASSWD);
-////        if (trustStorePassword != null) {
-////            configBuilder.setTrustStorePW(opts, trustStorePassword);
-////        }
-////        String keyPassword = options.get(KEY_PASSWD);
-////        if (keyPassword != null) {
-////            configBuilder.setKeyPW(opts, keyPassword);
-////        }
-//
-//        if (options.get(org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE) != null) {
-//            delegate.setConfigString(opts, options.get(
-//                            org.apache.synapse.commons.vfs.VFSConstants.SCHEME), org.apache.synapse.commons.vfs.VFSConstants.FILE_TYPE,
-//                    options.get(VFSConstants.FILE_TYPE));
-//        }
-//
-////        Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
-////
-////        boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
-////        if (options.get(ENCRYPTION_ENABLED) != null) {
-////            smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
-////        }
-////
-////        String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
-////        if (diskfileshare != null) {
-////            smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
-////        }
-//
-//        return opts;
-//    }
 
     /**
      * Function to resolve hostname of the vfs uri
@@ -639,8 +553,54 @@ public class Utils {
                 delegate.setConfigString(opts, (String)options.get("VFS_SCHEME"), "filetype", (String)options.get("filetype"));
             }
 
+            Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
+
+            boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
+            if (options.get(ENCRYPTION_ENABLED) != null) {
+                smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
+            }
+
+            String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
+            if (diskfileshare != null) {
+                smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
+            }
+
             return opts;
         }
+    }
+
+    public static ArrayList<String> validateAndGetDiskShareAccessMask(String diskShareAccessMask) {
+        // Prepare the set of allowed access mask values
+        Set<String> allowedValues = new HashSet<String>();
+        for (AccessMask mask : AccessMask.values()) {
+            allowedValues.add(mask.name());
+        }
+
+        // Assign the validated value
+        ArrayList<String> outDiskShareAccessMasks = new ArrayList<String>();
+
+        // Validate and collect allowed values
+        if (diskShareAccessMask != null) {
+            String[] masks = diskShareAccessMask.split(",");
+            for (String mask : masks) {
+                String accessMask = mask.trim();
+                if (allowedValues.contains(accessMask)) {
+                    outDiskShareAccessMasks.add(accessMask);
+                } else {
+                    log.warn("Access mask is not valid and was ignored: " + mask);
+                }
+            }
+        }
+
+        // Fallback to default if nothing is valid or input was null
+        if (outDiskShareAccessMasks.isEmpty()) {
+            if (log.isDebugEnabled()) {
+                log.debug("Set the access mask to default MAXIMUM_ALLOWED since the access mask is not defined or the defined values are not valid.");
+            }
+            outDiskShareAccessMasks.add(DISK_SHARE_ACCESS_MASK_MAX_ALLOWED);
+        }
+
+        return outDiskShareAccessMasks;
     }
 
     public static boolean isFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {

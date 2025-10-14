@@ -16,6 +16,7 @@ import java.text.DateFormat;
 import java.util.Map;
 import java.util.Properties;
 
+import static org.wso2.carbon.inbound.vfs.Utils.extractPath;
 import static org.wso2.carbon.inbound.vfs.Utils.sanitizeFileUriWithSub;
 
 public class MoveAction implements Action {
@@ -38,6 +39,7 @@ public class MoveAction implements Action {
         FileSystemOptions destinationFSO = null;
         Map<String, String> query = VFSUtils.parseSchemeFileOptions(targetLocation, new Properties());
         query.putAll(vfsConfig.getVfsSchemeProperties());
+        targetLocation = extractPath(targetLocation);
         try {
             destinationFSO = Utils.attachFileSystemOptions(query, fsManager);
         } catch (Exception e) {
@@ -57,7 +59,6 @@ public class MoveAction implements Action {
 
             FileObject moveToDirectory = fsManager.resolveFile(targetLocation, destinationFSO);
             FileObject dest = moveToDirectory.resolveFile(fileObject.getName().getBaseName());
-
             if (!StringUtils.isEmpty(query.get(org.wso2.carbon.inbound.vfs.VFSConstants.FORCE_CREATE_FOLDER))) {
                 String isForceCreated = query.get(VFSConstants.FORCE_CREATE_FOLDER);
                 if (Boolean.parseBoolean(isForceCreated)) {
@@ -65,9 +66,7 @@ public class MoveAction implements Action {
                 }
             }
 
-            if (vfsConfig.isUpdateLastModified()) {
-                dest.setUpdateLastModified(vfsConfig.isUpdateLastModified());
-            }
+            dest.setUpdateLastModified(vfsConfig.isUpdateLastModified());
 
             if (vfsConfig.getMoveTimestampFormat() != null) {
                 DateFormat moveTimestampFormat = vfsConfig.getMoveTimestampFormat();
@@ -75,6 +74,15 @@ public class MoveAction implements Action {
             }
 
             fileObject.moveTo(dest);
+            // Manually update last-modified time if config allows
+            if (vfsConfig.isUpdateLastModified()) {
+                try {
+                    long srcModifiedTime = fileObject.getContent().getLastModifiedTime();
+                    dest.getContent().setLastModifiedTime(srcModifiedTime);
+                } catch (Exception e) {
+                    log.warn("Failed to preserve last modified timestamp", e);
+                }
+            }
             log.info("File moved");
 
         } else {

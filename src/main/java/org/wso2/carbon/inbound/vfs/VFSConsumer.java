@@ -57,8 +57,6 @@ public class VFSConsumer extends GenericPollingConsumer {
     private String replyFileName;
     private boolean append = false;
     private boolean resolveHostsDynamically = false;
-    private boolean avoidPermissionCheck = false;
-    private boolean passive = false;
     private Long failedRecordNextRetryDuration = 30000L; // Default 30 seconds
     private final ScheduledExecutorService retryScheduler;
     private boolean isMounted = false;
@@ -77,7 +75,7 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         try {
             StandardFileSystemManager mgr = new StandardFileSystemManager();
-            mgr.setConfiguration(getClass().getClassLoader().getResource("providers.xml"));
+            mgr.setClassLoader(getClass().getClassLoader());
             mgr.init();
             this.fsManager = mgr;
         } catch (FileSystemException e) {
@@ -120,7 +118,7 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         try {
             StandardFileSystemManager mgr = new StandardFileSystemManager();
-            mgr.setConfiguration(getClass().getClassLoader().getResource("providers.xml"));
+            mgr.setClassLoader(getClass().getClassLoader());
             mgr.init();
             this.fsManager = mgr;
         } catch (FileSystemException e) {
@@ -195,15 +193,6 @@ public class VFSConsumer extends GenericPollingConsumer {
             // Attach per-scheme options (SFTP, FTP, SMB, etc.)
             fso = Utils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
 
-            // Apply passive mode for FTP if enabled
-            if (passive && (fileURI.startsWith("ftp://") || fileURI.startsWith("ftps://"))) {
-                if (fso == null) {
-                    fso = new FileSystemOptions();
-                }
-                // Add passive mode configuration to FSO
-                applyPassiveMode(fso);
-            }
-
         } catch (Exception e) {
             log.warn("Unable to attach scheme options for: " + maskURLPassword(fileURI), e);
             fso = null; // continue; many schemes work without explicit options
@@ -217,20 +206,6 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         try {
-            // Check permissions if not avoiding permission check
-            if (!avoidPermissionCheck) {
-                if (!root.exists() || !root.isReadable()) {
-                    log.warn("File/Directory not accessible: " + maskURLPassword(fileURI));
-                    return null;
-                }
-            } else {
-                // Skip permission check but still verify existence
-                if (!root.exists()) {
-                    log.warn("File/Directory does not exist: " + maskURLPassword(fileURI));
-                    return null;
-                }
-            }
-
             if (root.getType() == FileType.FILE) {
                 // Single-file mode
                 processFile(root);
@@ -249,6 +224,16 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         return null;
+    }
+
+    @Override
+    public void resume() {
+
+    }
+
+    @Override
+    public void pause() {
+
     }
 
     /* =========================
@@ -519,22 +504,21 @@ public class VFSConsumer extends GenericPollingConsumer {
 
             // Check if file is empty
             if (EMPTY_MD5.equals(md5Before)) {
-                return false; // Empty file is considered complete
+                return false;
             }
 
             // Wait and check again
-            Thread.sleep(1000); // Wait 1 second
-            file.refresh(); // Refresh file object
+            Thread.sleep(1000);
+            file.refresh();
             String md5After = getMD5Checksum(file);
 
-            // If checksums differ, file is still being written
             return !md5Before.equals(md5After);
 
         } catch (Exception e) {
             if (log.isDebugEnabled()) {
                 log.debug("Error checking if file is uploading: " + maskURLPassword(file.toString()), e);
             }
-            return true; // Assume still uploading on error
+            return true;
         }
     }
 
@@ -602,17 +586,6 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         return uri;
-    }
-
-    /**
-     * Apply passive mode configuration for FTP
-     */
-    private void applyPassiveMode(FileSystemOptions fso) {
-        // TODO: Implementation depends on your VFS version and FTP provider
-        // This is a placeholder for the actual passive mode configuration
-        if (log.isDebugEnabled()) {
-            log.debug("Applied passive mode configuration");
-        }
     }
 
     /* =========================

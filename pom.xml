@@ -19,6 +19,8 @@
         <maven.compiler.target>8</maven.compiler.target>
         <carbon.mediation.version>4.5.0-SNAPSHOT</carbon.mediation.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <com.hierynomus.smbj.version>0.11.3.wso2v1</com.hierynomus.smbj.version>
+        <com.hierynomus.asn1.version>0.6.0.wso2v1</com.hierynomus.asn1.version>
     </properties>
 
     <dependencies>
@@ -32,12 +34,12 @@
         <dependency>
             <groupId>org.wso2.org.apache.commons</groupId>
             <artifactId>commons-vfs2</artifactId>
-            <version>2.10.0-wso2v3</version>
+            <version>2.10.0-wso2v4-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.wso2.org.apache.commons</groupId>
             <artifactId>commons-vfs2-sandbox</artifactId>
-            <version>2.10.0-wso2v3</version>
+            <version>2.10.0-wso2v4-SNAPSHOT</version>
         </dependency>
 
         <dependency>
@@ -49,6 +51,16 @@
             <groupId>org.apache.synapse</groupId>
             <artifactId>synapse-core</artifactId>
             <version>4.0.0-wso2v227</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hierynomus.wso2</groupId>
+            <artifactId>smbj</artifactId>
+            <version>${com.hierynomus.smbj.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.hierynomus.wso2</groupId>
+            <artifactId>asn-one</artifactId>
+            <version>${com.hierynomus.asn1.version}</version>
         </dependency>
     </dependencies>
     <build>
