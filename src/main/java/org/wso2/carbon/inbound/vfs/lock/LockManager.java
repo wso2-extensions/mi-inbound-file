@@ -20,7 +20,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Random;
 
-import static org.apache.synapse.commons.vfs.VFSUtils.maskURLPassword;
+import static org.wso2.carbon.inbound.vfs.Utils.maskURLPassword;
+
 
 public class LockManager {
     private static final Log log = LogFactory.getLog(LockManager.class);
@@ -85,8 +86,6 @@ public class LockManager {
 
         if (clusterWare) {
             // Set distributed lock params if your VFSParamDTO supports them
-//             vfsParamDTO.setDistributedLock(distributedLock);
-//             vfsParamDTO.setDistributedLockTimeout(distributedLockTimeout);
         }
 
         return acquireLock(fsManager, fileObject, vfsParamDTO, fso, true);

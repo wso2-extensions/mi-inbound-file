@@ -2,6 +2,7 @@ package org.wso2.carbon.inbound.vfs;
 
 import com.hierynomus.msdtyp.AccessMask;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.WordUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.commons.vfs.VFSConstants;
@@ -35,6 +36,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
@@ -683,4 +685,40 @@ public class Utils {
 
     }
 
+    public static String stripVfsSchemeIfPresent(String uri) {
+        return uri != null && uri.startsWith("vfs:") ? uri.substring(4) : uri;
+    }
+
+    public static Map<String, String> parseSchemeFileOptions(String fileURI, Properties vfsProperties) {
+        String scheme = UriParser.extractScheme(fileURI);
+        if (scheme == null) {
+            return null;
+        } else {
+            Map<String, String> schemeFileOptions = parseSchemeFileOptions(scheme, fileURI);
+            addOptions(schemeFileOptions, vfsProperties);
+            return schemeFileOptions;
+        }
+    }
+
+    private static Map<String, String> parseSchemeFileOptions(String scheme, String fileURI) {
+        HashMap<String, String> schemeFileOptions = new HashMap<>();
+        schemeFileOptions.put(VFSConstants.SCHEME, scheme);
+        try {
+            Map<String, String> queryParams = UriParser.extractQueryParams(fileURI);
+            schemeFileOptions.putAll(queryParams);
+        } catch (FileSystemException e) {
+            log.error("Error while loading scheme query params", e);
+        }
+        return schemeFileOptions;
+    }
+
+    private static void addOptions(Map<String, String> schemeFileOptions, Properties vfsProperties) {
+        for (VFSConstants.SFTP_FILE_OPTION option : VFSConstants.SFTP_FILE_OPTION.values()) {
+            String paramValue = vfsProperties.getProperty(
+                    VFSConstants.SFTP_PREFIX + WordUtils.capitalize(option.toString()));
+            if (paramValue != null && !paramValue.isEmpty()) {
+                schemeFileOptions.put(option.toString(), paramValue);
+            }
+        }
+    }
 }

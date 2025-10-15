@@ -3,7 +3,6 @@ package org.wso2.carbon.inbound.vfs.processor;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.synapse.commons.vfs.VFSUtils;
 import org.wso2.carbon.inbound.vfs.Utils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.wso2.carbon.inbound.vfs.VFSConstants;
@@ -37,9 +36,11 @@ public class MoveAction implements Action {
     public void execute(FileObject fileObject) throws FileSystemException {
         // after success
         FileSystemOptions destinationFSO = null;
-        Map<String, String> query = VFSUtils.parseSchemeFileOptions(targetLocation, new Properties());
+        Map<String, String> query = Utils.parseSchemeFileOptions(targetLocation, new Properties());
         query.putAll(vfsConfig.getVfsSchemeProperties());
+        targetLocation = Utils.stripVfsSchemeIfPresent(targetLocation);
         targetLocation = extractPath(targetLocation);
+
         try {
             destinationFSO = Utils.attachFileSystemOptions(query, fsManager);
         } catch (Exception e) {
@@ -74,15 +75,6 @@ public class MoveAction implements Action {
             }
 
             fileObject.moveTo(dest);
-            // Manually update last-modified time if config allows
-            if (vfsConfig.isUpdateLastModified()) {
-                try {
-                    long srcModifiedTime = fileObject.getContent().getLastModifiedTime();
-                    dest.getContent().setLastModifiedTime(srcModifiedTime);
-                } catch (Exception e) {
-                    log.warn("Failed to preserve last modified timestamp", e);
-                }
-            }
             log.info("File moved");
 
         } else {

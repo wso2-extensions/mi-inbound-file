@@ -3,7 +3,6 @@ package org.wso2.carbon.inbound.vfs;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.apache.synapse.core.SynapseEnvironment;
 import org.wso2.carbon.inbound.endpoint.protocol.generic.GenericPollingConsumer;
 import org.wso2.carbon.inbound.vfs.filter.FileSelector;
@@ -25,15 +24,14 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.StringTokenizer;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.synapse.commons.vfs.VFSUtils.*;
+import static org.wso2.carbon.inbound.vfs.Utils.maskURLPassword;
+import static org.wso2.carbon.inbound.vfs.Utils.stripVfsSchemeIfPresent;
 
 public class VFSConsumer extends GenericPollingConsumer {
 
@@ -61,6 +59,7 @@ public class VFSConsumer extends GenericPollingConsumer {
     private final ScheduledExecutorService retryScheduler;
     private boolean isMounted = false;
 
+    private String fileURI;
     public VFSConsumer(Properties properties,
                        String name,
                        SynapseEnvironment synapseEnvironment,
@@ -102,6 +101,27 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
+
+        // Resolve input URI and subdirectory setting from config (supports /* or \*)
+        ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
+        if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
+            log.error("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+            throw new RuntimeException("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+        }
+        readSubDirectories = inFileUri.supportSubDirectories;
+        fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
+
+        // Resolve hosts dynamically if enabled
+        if (resolveHostsDynamically) {
+            fileURI = resolveHostDynamically(fileURI);
+        }
+        //Setup SFTP Options
+        try {
+            fso = Utils.attachFileSystemOptions(Utils.parseSchemeFileOptions(fileURI, properties), fsManager);
+        } catch (Exception e) {
+            log.warn("Unable to set the sftp Options", e);
+            fso = null;
+        }
     }
 
     public VFSConsumer(Properties properties,
@@ -146,6 +166,26 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
+        // Resolve input URI and subdirectory setting from config (supports /* or \*)
+        ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
+        if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
+            log.error("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+            throw new RuntimeException("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+        }
+        readSubDirectories = inFileUri.supportSubDirectories;
+        fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
+
+        // Resolve hosts dynamically if enabled
+        if (resolveHostsDynamically) {
+            fileURI = resolveHostDynamically(fileURI);
+        }
+        //Setup SFTP Options
+        try {
+            fso = Utils.attachFileSystemOptions(Utils.parseSchemeFileOptions(fileURI, properties), fsManager);
+        } catch (Exception e) {
+            log.warn("Unable to set the sftp Options", e);
+            fso = null;
+        }
     }
 
     /**
@@ -170,32 +210,10 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     @Override
     public Object poll() {
-        // Resolve input URI and subdirectory setting from config (supports /* or \*)
-        ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
-        if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
-            log.error("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
-            return null;
-        }
-        readSubDirectories = inFileUri.supportSubDirectories;
-        String fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
-
-        // Resolve hosts dynamically if enabled
-        if (resolveHostsDynamically) {
-            fileURI = resolveHostDynamically(fileURI);
-        }
 
         if (log.isDebugEnabled()) {
             log.debug("Polling VFS location: " + maskURLPassword(fileURI) +
                     " (recursive=" + readSubDirectories + ")");
-        }
-
-        try {
-            // Attach per-scheme options (SFTP, FTP, SMB, etc.)
-            fso = Utils.attachFileSystemOptions(vfsConfig.getVfsSchemeProperties(), fsManager);
-
-        } catch (Exception e) {
-            log.warn("Unable to attach scheme options for: " + maskURLPassword(fileURI), e);
-            fso = null; // continue; many schemes work without explicit options
         }
 
         FileObject root = initFileCheck(fileURI);
@@ -267,7 +285,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                 if (base.endsWith(".lock") || base.endsWith(".fail")) {
                     continue;
                 }
-
 
                 // Check if this is a failed record
                 boolean isFailedRecord = Utils.isFailRecord(fsManager, child, fso) || Utils.isFailedRecordInFailedList(child, vfsConfig);
@@ -347,6 +364,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         // Acquire lock if file locking is enabled
+        fileLock = vfsConfig.isFileLocking();
         LockManager lockManager = new LockManager(fileLock, vfsConfig,
                 fsManager, fso, vfsConfig.isClusterAware());
 
@@ -356,7 +374,7 @@ public class VFSConsumer extends GenericPollingConsumer {
             return;
         }
 
-        boolean skipUnlock = false;
+//        boolean skipUnlock = false;
 
         try {
             // Pre-processing hook (e.g., acquire lock, tmp rename, etc.)
@@ -399,9 +417,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                     postProcessingHandler.onSuccess(file);
                 } else {
                     // handle the failed records here too
-                    String timeStamp =
-                            Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
-                    Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
                     postProcessingHandler.onFail(file);
                 }
             }
@@ -411,16 +426,15 @@ public class VFSConsumer extends GenericPollingConsumer {
                 String timeStamp =
                         Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
                 Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
-                postProcessingHandler.onFail(file);
             } catch (Exception failHandlingError) {
                 log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
                 // Mark as failed record if we couldn't handle the failure
                 Utils.markFailRecord(fsManager, file, fso);
-                skipUnlock = true;
+//                skipUnlock = true;
             }
         } finally {
             // Release lock if file locking is enabled and we shouldn't skip
-            if (fileLock && !skipUnlock) {
+            if (fileLock) {
                 Utils.releaseLock(fsManager, file, fso);
                 if (log.isDebugEnabled()) {
                     log.debug("Released the lock for file: " + maskURLPassword(file.toString()));
@@ -592,10 +606,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                 Helpers
        ========================= */
 
-    private String stripVfsSchemeIfPresent(String uri) {
-        return uri != null && uri.startsWith("vfs:") ? uri.substring(4) : uri;
-    }
-
     private void safeClose(FileObject fo) {
         if (fo != null) {
             try { fo.close(); } catch (Exception ignore) {}
@@ -655,10 +665,10 @@ public class VFSConsumer extends GenericPollingConsumer {
                 wasError = false;
             } catch (FileSystemException e) {
                 if (retryCount >= vfsConfig.getMaxRetryCount()) {
-                    log.error("Repeatedly failed to resolve the file URI: " + Utils.maskURLPassword(fileURI), e);
+                    log.error("Repeatedly failed to resolve the file URI: " + maskURLPassword(fileURI), e);
                     return null;
                 } else {
-                    log.warn("Failed to resolve the file URI: " + Utils.maskURLPassword(fileURI) + ", in attempt "
+                    log.warn("Failed to resolve the file URI: " + maskURLPassword(fileURI) + ", in attempt "
                             + retryCount + ", " + e.getMessage() + " Retrying in " + vfsConfig.getReconnectTimeout()
                             + " milliseconds.");
                 }
