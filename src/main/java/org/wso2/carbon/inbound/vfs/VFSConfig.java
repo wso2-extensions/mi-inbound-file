@@ -290,8 +290,7 @@ public class VFSConfig {
             try {
                 this.failedRecordNextRetryDuration = Long.parseLong(retryDurationStr);
             } catch (NumberFormatException e) {
-                this.failedRecordNextRetryDuration = Long.parseLong(
-                        properties.getProperty("30000"));
+                this.failedRecordNextRetryDuration = 30000L;
                 log.warn("Invalid failedRecordNextRetryDuration value: " + retryDurationStr +
                         ". Using default: " + failedRecordNextRetryDuration);
             }
@@ -380,7 +379,7 @@ public class VFSConfig {
 
     /**
      * Helper method to decrypt parameters if required.
-     * If the parameter is defined as - {wso2:vault-decrypt('Parameter')}, then this method will treat it as deryption
+     * If the parameter is defined as - {wso2:vault-decrypt('Parameter')}, then this method will treat it as decryption
      * required and do the relevant decryption for that part.
      *
      * @param parameter

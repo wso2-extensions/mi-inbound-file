@@ -157,7 +157,7 @@ public class Utils {
     /**
      * Extracts the hostname from a URI.  The scheme://userinfo@ part has
      * been removed.
-     * extracted hostname will be reoved from the StringBuilder
+     * extracted hostname will be removed from the StringBuilder
      */
     private static String extractHostName(StringBuilder name) {
         final int maxlen = name.length();

@@ -191,7 +191,7 @@ jobs:
                       if params:
                           operation_params.append({
                               'operation': 'init',
-                              'title': 'Initialize Kafka Inbound Endpoint',
+                              'title': 'Initialize File Inbound Endpoint',
                               'params': params
                           })
                   else:

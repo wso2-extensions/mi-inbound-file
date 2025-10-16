@@ -83,9 +83,6 @@ public class SizeCheckFilter implements Filter {
         }
     }
 
-
-
-
     /**
      * This Function calculates the MD5 Hash of the FileObject, waits
      * checkSizeInterval [ms] time, and calculates the MD5 Hash again. If they
@@ -115,7 +112,7 @@ public class SizeCheckFilter implements Filter {
             String md5AfterSleep = getMD5Checksum(child);
             if (!md5.equals(md5AfterSleep)) {
                 //file is still uploading
-                log.debug("File ist still uploading. md5 Hashcode Before="+md5 + " After="+md5AfterSleep);
+                log.debug("File is still uploading. md5 Hashcode Before="+md5 + " After="+md5AfterSleep);
                 return true;
             }
         } catch (Exception e) {

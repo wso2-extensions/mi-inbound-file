@@ -101,7 +101,7 @@ public class LockManager {
 
 
     /**
-     * Acquires a file item lock before processing the item, guaranteing that
+     * Acquires a file item lock before processing the item, guaranteeing that
      * the file is not processed while it is being uploaded and/or the item is
      * not processed by two listeners
      *

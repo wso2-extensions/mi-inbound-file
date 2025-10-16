@@ -338,10 +338,8 @@ public class VFSConsumer extends GenericPollingConsumer {
                         processFile(child);
                     } else if (vfsConfig.getFileProcessingCount() != null && processCount > vfsConfig.getFileProcessingCount()) {
                         if (log.isDebugEnabled()) {
-                            if (log.isDebugEnabled()) {
-                                log.debug("Skipping file (count limit " + vfsConfig.getFileProcessingCount() +
-                                        " reached): " + maskURLPassword(child.toString()));
-                            }
+                            log.debug("Skipping file (count limit " + vfsConfig.getFileProcessingCount() +
+                                    " reached): " + maskURLPassword(child.toString()));
                         }
                         break;
                     } else {
