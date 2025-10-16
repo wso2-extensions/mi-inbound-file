@@ -11,9 +11,9 @@ dependencies:
   - groupId: "com.hierynomus"
     artifactId: "smbj"
     version: "0.13.0"
-  - groupId: "org.wso2.maven"
+  - groupId: "org.wso2.integration.inbound"
     artifactId: "mi-inbound-file"
-    version: "1.0-SNAPSHOT"
+    version: "1.0.0-SNAPSHOT"
 
 repositories:
   - id: "central"

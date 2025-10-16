@@ -1,7 +1,7 @@
 {
-  "name": "VFS",
-  "type": "vfs-inbound-endpoint",
-  "title": "VFS",
+  "name": "file",
+  "type": "event-integration",
+  "title": "File (Inbound)",
   "id": "org.wso2.carbon.inbound.vfs.VFSConsumer",
   "elements": [
     {
@@ -203,17 +203,6 @@
               "inputType": "string",
               "defaultValue": "",
               "hidden": "true",
-              "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.ReplyFileName",
-              "displayName": "Reply File Name",
-              "inputType": "string",
-              "hidden": "true",
-              "defaultValue": "response.xml",
               "required": "false"
             }
           },
