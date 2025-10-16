@@ -22,6 +22,17 @@
           {
             "type": "attribute",
             "value": {
+              "name": "class",
+              "displayName": "Class Name",
+              "inputType": "string",
+              "required": "true",
+              "hidden": true,
+              "defaultValue": "org.wso2.carbon.inbound.vfs.VFSConsumer"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "generateSequences",
               "displayName": "Automatically generate sequences",
               "inputType": "checkbox",
