@@ -11,7 +11,7 @@
     </parent>
     <groupId>org.wso2.integration.inbound</groupId>
     <artifactId>mi-inbound-file</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>0.9.0-SNAPSHOT</version>
     <name>File Event Listener</name>
 
     <properties>
