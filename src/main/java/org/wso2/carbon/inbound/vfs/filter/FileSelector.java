@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
+import org.apache.commons.lang.StringUtils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 
 import java.util.ArrayList;
@@ -34,17 +35,16 @@ public class FileSelector {
     private final List<Filter> filters;
     public FileSelector(VFSConfig config, FileSystemManager fsManager) {
         filters = new ArrayList<>();
-        if (config.getFileNamePattern() != null && !config.getFileNamePattern().isEmpty()) {
+        if (StringUtils.isNotEmpty(config.getFileNamePattern())) {
             filters.add(new FileNameFilter(config));
         }
         if (config.getFileSizeLimit() >= 0) {
             filters.add(new SizeFilter(config));
         }
-        if (config.getCheckSizeInterval() != null && !config.getCheckSizeInterval().isEmpty()) {
+        if (config.getCheckSizeInterval() > 0) {
             filters.add(new SizeCheckFilter(config, fsManager));
         }
-        if ((config.getMaximumAge() != null && !config.getMaximumAge().toString().isEmpty()) ||
-                (config.getMinimumAge()!= null && !config.getMinimumAge().toString().isEmpty())) {
+        if ((config.getMaximumAge() != null) || (config.getMinimumAge()!= null)) {
             filters.add(new AgeFilter(config));
         }
     }

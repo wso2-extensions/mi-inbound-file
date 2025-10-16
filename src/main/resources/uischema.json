@@ -530,6 +530,61 @@
           {
             "type": "attribute",
             "value": {
+              "name": "transport.vfs.CheckSizeIgnoreEmpty",
+              "displayName": "Ignore Empty Files During Size Check",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "When true, empty files are ignored during file size checks."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.CheckSizeInterval",
+              "displayName": "Size Check Interval (ms)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Duration in milliseconds between file size checks."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MinimumAge",
+              "displayName": "Minimum File Age (s)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Minimum age in seconds since the last modification before processing a file."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MaximumAge",
+              "displayName": "Maximum File Age (s)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Maximum age in seconds since the last modification; older files will be skipped."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileSizeLimit",
+              "displayName": "File Size Limit (bytes)",
+              "inputType": "string",
+              "defaultValue": "-1",
+              "required": "false",
+              "helpTip": "Process files whose size is ≤ this value (in bytes). Use -1 for unlimited."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
               "name": "transport.vfs.SubFolderTimestampFormat",
               "displayName": "Sub Folder Timestamp Format",
               "inputType": "string",

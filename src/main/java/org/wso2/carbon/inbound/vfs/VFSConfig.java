@@ -32,6 +32,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -80,9 +81,9 @@ public class VFSConfig {
     private DateFormat moveTimestampFormat;
 
     /** containing the time in [ms] between the size check on files (to avoid reading files which are currently written) */
-    private String checkSizeInterval = null;
+    private long checkSizeInterval;
     /** does the checkSize Lock mechanisme take empty files or not, default = false */
-    private String checkSizeIgnoreEmpty = "false";
+    private boolean checkSizeIgnoreEmpty;
 
 
     private boolean streaming;
@@ -152,9 +153,9 @@ public class VFSConfig {
     
     private Long minimumAge = null; //defines a minimum age of a file before being consumed. Use to avoid just written files to be consumed
     private Long maximumAge = null; //defines a maximum age of a file being consumed. Old files will stay in the directory
-    private boolean append = false;
+    private boolean append;
     private boolean avoidPermissionCheck = false;
-    private boolean passive = false;
+    private boolean passive;
     private Long failedRecordNextRetryDuration = 30000L;
 
     public VFSConfig(Properties properties) {
@@ -211,8 +212,11 @@ public class VFSConfig {
                         VFSConstants.DEFAULT_TRANSPORT_FAILED_RECORD_TIMESTAMP_FORMAT);
 
         // Check size mechanism
-        this.checkSizeInterval = properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_INTERVAL);
-        this.checkSizeIgnoreEmpty = properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_IGNORE_EMPTY, "false");
+        this.checkSizeInterval = Optional.ofNullable(properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_INTERVAL))
+                .filter(s -> !s.isEmpty())
+                .map(Long::parseLong)
+                .orElse(0L);
+        this.checkSizeIgnoreEmpty = Boolean.parseBoolean(properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_IGNORE_EMPTY, "false"));
 
         // Retry / reconnect
         this.maxRetryCount = Integer.parseInt(
@@ -269,11 +273,11 @@ public class VFSConfig {
 
         // Min/Max Age
         String minAgeStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_MINIMUM_AGE);
-        if (minAgeStr != null) {
+        if (minAgeStr != null && !minAgeStr.isEmpty()) {
             this.minimumAge = Long.valueOf(minAgeStr);
         }
         String maxAgeStr = properties.getProperty(VFSConstants.TRANSPORT_FILE_MAXIMUM_AGE);
-        if (maxAgeStr != null) {
+        if (maxAgeStr != null && !maxAgeStr.isEmpty()) {
             this.maximumAge = Long.valueOf(maxAgeStr);
         }
 
@@ -452,11 +456,11 @@ public class VFSConfig {
         return moveTimestampFormat;
     }
 
-    public String getCheckSizeInterval() {
+    public long getCheckSizeInterval() {
         return checkSizeInterval;
     }
 
-    public String getCheckSizeIgnoreEmpty() {
+    public boolean getCheckSizeIgnoreEmpty() {
         return checkSizeIgnoreEmpty;
     }
 

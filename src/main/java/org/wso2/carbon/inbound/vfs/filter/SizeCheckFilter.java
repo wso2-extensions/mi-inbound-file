@@ -53,7 +53,7 @@ public class SizeCheckFilter implements Filter {
 
 
     private boolean isFileStillUploading(FileObject child) {
-        if(vfsConfig.getCheckSizeIgnoreEmpty().isEmpty() && vfsConfig.getCheckSizeInterval().isEmpty()) {
+        if(vfsConfig.getCheckSizeIgnoreEmpty() && vfsConfig.getCheckSizeInterval() > 0) {
             //CheckEmpty and CheckSize are not active - return false (file is not uploading)
             return false;
         }
@@ -93,14 +93,13 @@ public class SizeCheckFilter implements Filter {
      */
     private boolean isFileStillChangingSize(FileObject child, String md5) {
         //check if the lock mechanism is activated
-        if (vfsConfig.getCheckSizeInterval().isEmpty()) {
+        if (vfsConfig.getCheckSizeInterval() > 0) {
             //not checking the file size changing
             return false;
         }
         try {
             //get interval time
-            String checkSizeIntervalString = vfsConfig.getCheckSizeInterval();
-            Long checkSizeInterval = Long.valueOf(checkSizeIntervalString);
+            long checkSizeInterval = vfsConfig.getCheckSizeInterval();
 
             //wait interval time
             log.debug("Check if file is still uploading. Now sleep "+checkSizeInterval+" ms");
@@ -180,7 +179,7 @@ public class SizeCheckFilter implements Filter {
      * @return true if configuration is set and file is empty
      */
     private boolean isFileEmpty(String md5) {
-        if (vfsConfig.getCheckSizeIgnoreEmpty().isEmpty()) {
+        if (vfsConfig.getCheckSizeIgnoreEmpty()) {
             return EMPTY_MD5.equals(md5);
         }
         return false;
