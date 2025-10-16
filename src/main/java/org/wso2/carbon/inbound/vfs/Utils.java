@@ -1,3 +1,21 @@
+/*
+ *  Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
 package org.wso2.carbon.inbound.vfs;
 
 import com.hierynomus.msdtyp.AccessMask;
@@ -33,64 +51,32 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static org.wso2.carbon.inbound.vfs.VFSConstants.DISK_SHARE_ACCESS_MASK;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.DISK_SHARE_ACCESS_MASK_MAX_ALLOWED;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.ENCRYPTION_ENABLED;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.FAIL_FILE_SUFFIX;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.IMPLICIT_MODE;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.KEY_PASSWD;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.KEY_STORE;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.KS_PASSWD;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.LOCK_FILE_SUFFIX;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.PASSIVE_MODE;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.PASSWORD_PATTERN;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.PROTECTION_MODE;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.TRUST_STORE;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.TS_PASSWD;
+import static org.wso2.carbon.inbound.vfs.VFSConstants.URL_PATTERN;
 
 public class Utils {
 
     private static final Log log = LogFactory.getLog(Utils.class);
-
-    private static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z0-9]+://.*");
-    private static final Pattern PASSWORD_PATTERN = Pattern.compile(":(?:[^/]+)@");
-
-    /**
-     * SSL Keystore.
-     */
-    private static final String KEY_STORE = "vfs.ssl.keystore";
-
-    /**
-     * SSL Truststore.
-     */
-    private static final String TRUST_STORE = "vfs.ssl.truststore";
-
-    /**
-     * SSL Keystore password.
-     */
-    private static final String KS_PASSWD = "vfs.ssl.kspassword";
-
-    /**
-     * SSL Truststore password.
-     */
-    private static final String TS_PASSWD = "vfs.ssl.tspassword";
-
-    /**
-     * SSL Key password.
-     */
-    private static final String KEY_PASSWD = "vfs.ssl.keypassword";
-
-    /**
-     * Passive mode
-     */
-    public static final String PASSIVE_MODE = "vfs.passive";
-
-    /**
-     * FTPS implicit mode
-     */
-    public static final String IMPLICIT_MODE = "vfs.implicit";
-
-    public static final String PROTECTION_MODE = "vfs.protection";
-
-    private static final String ENCRYPTION_ENABLED = "vfs.EncryptionEnabled";
-
-    public static final String DISK_SHARE_ACCESS_MASK = "vfs.diskShareAccessMask";
-
-    public static final String DISK_SHARE_ACCESS_MASK_MAX_ALLOWED = "MAXIMUM_ALLOWED";
 
     public static String maskURLPassword(String url) {
         Matcher urlMatcher = URL_PATTERN.matcher(url);
@@ -104,12 +90,13 @@ public class Utils {
 
     /**
      * Function to resolve hostname of the vfs uri
+     *
      * @param uri URI need to resolve
      * @return hostname resolved uri
-     * @throws FileSystemException Unable to decode due to malformed URI
+     * @throws FileSystemException  Unable to decode due to malformed URI
      * @throws UnknownHostException Error occurred while resolving hostname of URI
      */
-    public static String resolveUriHost (String uri) throws FileSystemException, UnknownHostException {
+    public static String resolveUriHost(String uri) throws FileSystemException, UnknownHostException {
         return resolveUriHost(uri, new StringBuilder());
     }
 
@@ -117,13 +104,14 @@ public class Utils {
      * Function to resolve the hostname of uri to ip for following vfs protocols. if not the protocol listed, return
      * same uri provided for {uri}
      * Protocols resolved : SMB
-     * @param uri URI need to resolve
+     *
+     * @param uri        URI need to resolve
      * @param strBuilder string builder to use to build the resulting uri
      * @return hostname resolved uri
-     * @throws FileSystemException Unable to decode due to malformed URI
+     * @throws FileSystemException  Unable to decode due to malformed URI
      * @throws UnknownHostException Error occurred while resolving hostname of URI
      */
-    public static String resolveUriHost (String uri, StringBuilder strBuilder)
+    public static String resolveUriHost(String uri, StringBuilder strBuilder)
             throws FileSystemException, UnknownHostException {
 
         if (uri != null && strBuilder != null) {
@@ -233,7 +221,7 @@ public class Utils {
     public static void decode(StringBuilder buffer, int offset, int length) throws FileSystemException {
         int index = offset;
 
-        for(int count = length; count > 0; ++index) {
+        for (int count = length; count > 0; ++index) {
             char ch = buffer.charAt(index);
             if (ch == '%') {
                 if (count < 3) {
@@ -246,7 +234,7 @@ public class Utils {
                     throw new FileSystemException("vfs.provider/invalid-escape-sequence.error", buffer.substring(index, index + 3));
                 }
 
-                char value = (char)(dig1 << 4 | dig2);
+                char value = (char) (dig1 << 4 | dig2);
                 buffer.setCharAt(index, value);
                 buffer.delete(index + 1, index + 3);
                 count -= 2;
@@ -254,7 +242,6 @@ public class Utils {
 
             --count;
         }
-
     }
 
 
@@ -308,75 +295,6 @@ public class Utils {
         return children;
     }
 
-    /**
-     * Comparator classed used to sort the files according to user input
-     */
-    public static class FileNameAscComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            return o1.getName().compareTo(o2.getName());
-        }
-    }
-
-    static class FileLastmodifiedtimestampAscComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            Long lDiff = 0l;
-            try {
-                lDiff = o1.getContent().getLastModifiedTime() - o2.getContent().getLastModifiedTime();
-            } catch (FileSystemException e) {
-                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
-            }
-            return lDiff.intValue();
-        }
-    }
-
-    static class FileSizeAscComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            Long lDiff = 0l;
-            try {
-                lDiff = o1.getContent().getSize() - o2.getContent().getSize();
-            } catch (FileSystemException e) {
-                log.warn("Unable to compare size of the two files.", e);
-            }
-            return lDiff.intValue();
-        }
-    }
-
-    static class FileNameDesComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            return o2.getName().compareTo(o1.getName());
-        }
-    }
-
-    static class FileLastmodifiedtimestampDesComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            Long lDiff = 0l;
-            try {
-                lDiff = o2.getContent().getLastModifiedTime() - o1.getContent().getLastModifiedTime();
-            } catch (FileSystemException e) {
-                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
-            }
-            return lDiff.intValue();
-        }
-    }
-
-    static class FileSizeDesComparator implements Comparator<FileObject> {
-        @Override
-        public int compare(FileObject o1, FileObject o2) {
-            Long lDiff = 0l;
-            try {
-                lDiff = o2.getContent().getSize() - o1.getContent().getSize();
-            } catch (FileSystemException e) {
-                log.warn("Unable to compare size of the two files.", e);
-            }
-            return lDiff.intValue();
-        }
-    }
-
     public static String optionallyAppendDateToUri(String moveToDirectoryURI, VFSConfig vfsConfig) {
         String strSubfoldertimestamp = vfsConfig.getSubfolderTimestamp();
         if (strSubfoldertimestamp != null) {
@@ -388,7 +306,7 @@ public class Utils {
                     moveToDirectoryURI = moveToDirectoryURI.substring(0, iIndex)
                             + strDateformat
                             + moveToDirectoryURI.substring(iIndex);
-                }else{
+                } else {
                     moveToDirectoryURI += strDateformat;
                 }
             } catch (Exception e) {
@@ -411,7 +329,7 @@ public class Utils {
                 FileUtils.writeStringToFile(failedRecordFile, record);
                 if (log.isDebugEnabled()) {
                     log.debug("Added fail record '"
-                            + Utils.maskURLPassword(record.toString())
+                            + Utils.maskURLPassword(record)
                             + "' into the record file '"
                             + recordFile + "'");
                 }
@@ -434,37 +352,41 @@ public class Utils {
     }
 
     public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo) {
-        markFailRecord(fsManager, fo, (FileSystemOptions)null);
+        markFailRecord(fsManager, fo, null);
     }
 
     public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
-        byte[] failValue = Long.toString((new Date()).getTime()).getBytes();
+
+        // generate a random fail value to ensure that there are no two parties
+        // processing the same file
+        byte[] failValue = (Long.toString((new Date()).getTime())).getBytes();
 
         try {
             String fullPath = getFullPath(fo);
-            FileObject failObject = fsManager.resolveFile(fullPath + ".fail", fso);
+            FileObject failObject = fsManager.resolveFile(fullPath + FAIL_FILE_SUFFIX, fso);
             if (!failObject.exists()) {
                 failObject.createFile();
             }
 
-            OutputStream stream = failObject.getContent().getOutputStream();
+            // write a lock file before starting of the processing, to ensure that the
+            // item is not processed by any other parties
 
+            OutputStream stream = failObject.getContent().getOutputStream();
             try {
                 stream.write(failValue);
                 stream.flush();
-            } catch (IOException var17) {
+            } catch (IOException e) {
                 failObject.delete();
-                log.error("Couldn't create the fail file before processing the file " + maskURLPassword(fullPath), var17);
+                log.error("Couldn't create the fail file before processing the file " + maskURLPassword(fullPath), e);
             } finally {
                 try {
                     stream.close();
-                } catch (IOException var16) {
-                    log.debug("Error closing stream", var16);
+                } catch (IOException e) {
+                    log.debug("Error closing stream", e);
                 }
-
                 failObject.close();
             }
-        } catch (FileSystemException var19) {
+        } catch (FileSystemException fse) {
             log.error("Cannot get the lock for the file : " + maskURLPassword(fo.getName().getURI()) + " before processing");
         }
     }
@@ -482,93 +404,90 @@ public class Utils {
     public static FileSystemOptions attachFileSystemOptions(Map<String, String> options, FileSystemManager fsManager) throws FileSystemException {
         if (options == null) {
             return null;
-        } else {
-            FileSystemOptions opts = new FileSystemOptions();
-            DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
-            Iterator var4 = options.entrySet().iterator();
-
-            while(var4.hasNext()) {
-                Map.Entry<String, String> entry = (Map.Entry)var4.next();
-                VFSConstants.SFTP_FILE_OPTION[] var6 = VFSConstants.SFTP_FILE_OPTION.values();
-                int var7 = var6.length;
-
-                for(int var8 = 0; var8 < var7; ++var8) {
-                    VFSConstants.SFTP_FILE_OPTION option = var6[var8];
-                    if (((String)entry.getKey()).equals(option.toString()) && entry.getValue() != null) {
-                        delegate.setConfigString(opts, "sftp", ((String)entry.getKey()).toLowerCase(), (String)entry.getValue());
-                    }
-                }
-            }
-
-            FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
-            String passiveMode = (String)options.get("vfs.passive");
-            if (passiveMode != null) {
-                configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
-            }
-
-            String implicitMode = (String)options.get("vfs.implicit");
-            if (implicitMode != null) {
-                if (Boolean.parseBoolean(implicitMode)) {
-                    configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
-                } else {
-                    configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
-                }
-            }
-
-            String protectionMode = (String)options.get("vfs.protection");
-            if ("P".equalsIgnoreCase(protectionMode)) {
-                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
-            } else if ("C".equalsIgnoreCase(protectionMode)) {
-                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
-            } else if ("S".equalsIgnoreCase(protectionMode)) {
-                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
-            } else if ("E".equalsIgnoreCase(protectionMode)) {
-                configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
-            }
-
-            String keyStore = (String)options.get("vfs.ssl.keystore");
-            if (keyStore != null) {
-                configBuilder.setKeyStore(opts, keyStore);
-            }
-
-            String trustStore = (String)options.get("vfs.ssl.truststore");
-            if (trustStore != null) {
-                configBuilder.setTrustStore(opts, trustStore);
-            }
-
-            String keyStorePassword = (String)options.get("vfs.ssl.kspassword");
-            if (keyStorePassword != null) {
-                configBuilder.setKeyStorePW(opts, keyStorePassword);
-            }
-
-            String trustStorePassword = (String)options.get("vfs.ssl.tspassword");
-            if (trustStorePassword != null) {
-                configBuilder.setTrustStorePW(opts, trustStorePassword);
-            }
-
-            String keyPassword = (String)options.get("vfs.ssl.keypassword");
-            if (keyPassword != null) {
-                configBuilder.setKeyPW(opts, keyPassword);
-            }
-
-            if (options.get("filetype") != null) {
-                delegate.setConfigString(opts, (String)options.get("VFS_SCHEME"), "filetype", (String)options.get("filetype"));
-            }
-
-            Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
-
-            boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
-            if (options.get(ENCRYPTION_ENABLED) != null) {
-                smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
-            }
-
-            String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
-            if (diskfileshare != null) {
-                smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
-            }
-
-            return opts;
         }
+
+        FileSystemOptions opts = new FileSystemOptions();
+        DelegatingFileSystemOptionsBuilder delegate = new DelegatingFileSystemOptionsBuilder(fsManager);
+
+        // setting all available configs regardless of the options.get(VFSConstants.SCHEME)
+        // because schemes of FileURI and MoveAfterProcess can be different
+
+        //sftp configs
+        for (Map.Entry<String, String> entry : options.entrySet()) {
+            for (VFSConstants.SFTP_FILE_OPTION option : VFSConstants.SFTP_FILE_OPTION.values()) {
+                if (entry.getKey().equals(option.toString()) && entry.getValue() != null) {
+                    delegate.setConfigString(opts, VFSConstants.SCHEME_SFTP, entry.getKey().toLowerCase(),
+                            entry.getValue());
+                }
+            }
+        }
+
+        FtpsFileSystemConfigBuilder configBuilder = FtpsFileSystemConfigBuilder.getInstance();
+
+        // ftp and ftps configs
+        String passiveMode = options.get(PASSIVE_MODE);
+        if (passiveMode != null) {
+            configBuilder.setPassiveMode(opts, Boolean.parseBoolean(passiveMode));
+        }
+
+        // ftps configs
+        String implicitMode = options.get(IMPLICIT_MODE);
+        if (implicitMode != null) {
+            if (Boolean.parseBoolean(implicitMode)) {
+                configBuilder.setFtpsMode(opts, FtpsMode.IMPLICIT);
+            } else {
+                configBuilder.setFtpsMode(opts, FtpsMode.EXPLICIT);
+            }
+        }
+        String protectionMode = options.get(PROTECTION_MODE);
+        if ("P".equalsIgnoreCase(protectionMode)) {
+            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.P);
+        } else if ("C".equalsIgnoreCase(protectionMode)) {
+            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.C);
+        } else if ("S".equalsIgnoreCase(protectionMode)) {
+            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.S);
+        } else if ("E".equalsIgnoreCase(protectionMode)) {
+            configBuilder.setDataChannelProtectionLevel(opts, FtpsDataChannelProtectionLevel.E);
+        }
+        String keyStore = options.get(KEY_STORE);
+        if (keyStore != null) {
+            configBuilder.setKeyStore(opts, keyStore);
+        }
+        String trustStore = options.get(TRUST_STORE);
+        if (trustStore != null) {
+            configBuilder.setTrustStore(opts, trustStore);
+        }
+        String keyStorePassword = options.get(KS_PASSWD);
+        if (keyStorePassword != null) {
+            configBuilder.setKeyStorePW(opts, keyStorePassword);
+        }
+        String trustStorePassword = options.get(TS_PASSWD);
+        if (trustStorePassword != null) {
+            configBuilder.setTrustStorePW(opts, trustStorePassword);
+        }
+        String keyPassword = options.get(KEY_PASSWD);
+        if (keyPassword != null) {
+            configBuilder.setKeyPW(opts, keyPassword);
+        }
+
+        if (options.get(VFSConstants.FILE_TYPE) != null) {
+            delegate.setConfigString(opts, options.get(VFSConstants.SCHEME), VFSConstants.FILE_TYPE,
+                    options.get(VFSConstants.FILE_TYPE));
+        }
+
+        Smb2FileSystemConfigBuilder smb2FileSystemConfigBuilder = Smb2FileSystemConfigBuilder.getInstance();
+
+        boolean encryptionEnabled = Boolean.parseBoolean(options.get(ENCRYPTION_ENABLED));
+        if (options.get(ENCRYPTION_ENABLED) != null) {
+            smb2FileSystemConfigBuilder.setEncryptionEnabled(opts, encryptionEnabled);
+        }
+
+        String diskfileshare = options.get(DISK_SHARE_ACCESS_MASK);
+        if (diskfileshare != null) {
+            smb2FileSystemConfigBuilder.setDiskShareAccessMask(opts, validateAndGetDiskShareAccessMask(diskfileshare));
+        }
+
+        return opts;
     }
 
     public static ArrayList<String> validateAndGetDiskShareAccessMask(String diskShareAccessMask) {
@@ -609,20 +528,18 @@ public class Utils {
         try {
             String fullPath = fo.getName().getURI();
             String queryParams = "";
-            int pos = fullPath.indexOf(63);
+            int pos = fullPath.indexOf('?');
             if (pos > -1) {
                 queryParams = fullPath.substring(pos);
                 fullPath = fullPath.substring(0, pos);
             }
-
-            FileObject failObject = fsManager.resolveFile(fullPath + ".fail" + queryParams, fso);
+            FileObject failObject = fsManager.resolveFile(fullPath + FAIL_FILE_SUFFIX + queryParams, fso);
             if (failObject.exists()) {
                 return true;
             }
-        } catch (FileSystemException var7) {
+        } catch (FileSystemException e) {
             log.error("Couldn't release the fail for the file : " + maskURLPassword(fo.getName().getURI()));
         }
-
         return false;
     }
 
@@ -656,33 +573,38 @@ public class Utils {
         if (queryIndex != -1) {
             return uri.substring(0, queryIndex);
         }
-        return uri; // no parameters
+        return uri;
     }
 
-
+    /**
+     * Release a file item lock acquired either by the VFS listener or a sender
+     *
+     * @param fsManager which is used to resolve the processed file
+     * @param fo        representing the processed file
+     * @param fso       represents file system options used when resolving file from file system manager.
+     */
     public static void releaseLock(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
         String fullPath = fo.getName().getURI();
+        FileObject lockObject;
 
         try {
-            int pos = fullPath.indexOf(63);
+            int pos = fullPath.indexOf('?');
             if (pos > -1) {
                 fullPath = fullPath.substring(0, pos);
             }
-
-            FileObject lockObject = fsManager.resolveFile(fullPath + ".lock", fso);
+            lockObject = fsManager.resolveFile(fullPath + LOCK_FILE_SUFFIX, fso);
             if (lockObject.exists()) {
                 lockObject.delete();
             }
-        } catch (FileSystemException var8) {
-            log.error("Couldn't release the lock for the file : " + maskURLPassword(fo.getName().getURI()) + " after processing");
-
+        } catch (FileSystemException e) {
+            log.error("Couldn't release the lock for the file : "
+                    + maskURLPassword(fo.getName().getURI()) + " after processing");
             try {
-                ((DefaultFileSystemManager)fsManager).closeCachedFileSystem(fullPath + ".lock", fso);
-            } catch (Exception var7) {
-                log.warn("Unable to clear file system", var7);
+                ((DefaultFileSystemManager) fsManager).closeCachedFileSystem(fullPath + LOCK_FILE_SUFFIX, fso);
+            } catch (Exception e1) {
+                log.warn("Unable to clear file system", e1);
             }
         }
-
     }
 
     public static String stripVfsSchemeIfPresent(String uri) {
@@ -719,6 +641,75 @@ public class Utils {
             if (paramValue != null && !paramValue.isEmpty()) {
                 schemeFileOptions.put(option.toString(), paramValue);
             }
+        }
+    }
+
+    /**
+     * Comparator classed used to sort the files according to user input
+     */
+    public static class FileNameAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            return o1.getName().compareTo(o2.getName());
+        }
+    }
+
+    static class FileLastmodifiedtimestampAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0L;
+            try {
+                lDiff = o1.getContent().getLastModifiedTime() - o2.getContent().getLastModifiedTime();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileSizeAscComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0L;
+            try {
+                lDiff = o1.getContent().getSize() - o2.getContent().getSize();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare size of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileNameDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            return o2.getName().compareTo(o1.getName());
+        }
+    }
+
+    static class FileLastmodifiedtimestampDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0L;
+            try {
+                lDiff = o2.getContent().getLastModifiedTime() - o1.getContent().getLastModifiedTime();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare lastmodified timestamp of the two files.", e);
+            }
+            return lDiff.intValue();
+        }
+    }
+
+    static class FileSizeDesComparator implements Comparator<FileObject> {
+        @Override
+        public int compare(FileObject o1, FileObject o2) {
+            Long lDiff = 0L;
+            try {
+                lDiff = o2.getContent().getSize() - o1.getContent().getSize();
+            } catch (FileSystemException e) {
+                log.warn("Unable to compare size of the two files.", e);
+            }
+            return lDiff.intValue();
         }
     }
 }

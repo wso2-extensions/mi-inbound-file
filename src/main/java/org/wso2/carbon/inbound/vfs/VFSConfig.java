@@ -1,21 +1,21 @@
 /*
-*  Licensed to the Apache Software Foundation (ASF) under one
-*  or more contributor license agreements.  See the NOTICE file
-*  distributed with this work for additional information
-*  regarding copyright ownership.  The ASF licenses this file
-*  to you under the Apache License, Version 2.0 (the
-*  "License"); you may not use this file except in compliance
-*  with the License.  You may obtain a copy of the License at
-*
-*   http://www.apache.org/licenses/LICENSE-2.0
-*
-*  Unless required by applicable law or agreed to in writing,
-*  software distributed under the License is distributed on an
-*   * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-*  KIND, either express or implied.  See the License for the
-*  specific language governing permissions and limitations
-*  under the License.
-*/
+ *  Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
 package org.wso2.carbon.inbound.vfs;
 
 import org.apache.axis2.AxisFault;
@@ -282,8 +282,6 @@ public class VFSConfig {
         this.append = Boolean.parseBoolean(
                 properties.getProperty(VFSConstants.APPEND, "false"));
 
-//TODO:        this.avoidPermissionCheck = Boolean.parseBoolean(VFSConstants.AVOID_PERMISSION_CHECK);
-
         this.passive = Boolean.parseBoolean(
                 properties.getProperty("vfs.passive", "false"));
 
@@ -352,7 +350,7 @@ public class VFSConfig {
                 return Utils.resolveUriHost(uri, new StringBuilder());
             } catch (FileSystemException e) {
                 String errorMsg = "Unable to decode the malformed URI : " + Utils.maskURLPassword(uri);
-                //log the error since if we only throw AxisFault, we won't get the entire stacktrace in logs to
+                // log the error since if we only throw AxisFault, we won't get the entire stacktrace in logs to
                 // identify root cause to users
                 VFSTransportErrorHandler.handleException(log, errorMsg, e);
 

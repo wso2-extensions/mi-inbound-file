@@ -1,4 +1,24 @@
+/*
+ *  Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
 package org.wso2.carbon.inbound.vfs;
+
+import java.util.regex.Pattern;
 
 public class VFSConstants {
 
@@ -207,5 +227,56 @@ public class VFSConstants {
 
     // The waiting time of the file before picking it up (in milliseconds)
     public static final String WAIT_TIME_BEFORE_READ = "transport.vfs.waitTimeBeforeRead";
+
+    public static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z0-9]+://.*");
+    public static final Pattern PASSWORD_PATTERN = Pattern.compile(":(?:[^/]+)@");
+
+    /**
+     * SSL Keystore.
+     */
+    public static final String KEY_STORE = "vfs.ssl.keystore";
+
+    /**
+     * SSL Truststore.
+     */
+    public static final String TRUST_STORE = "vfs.ssl.truststore";
+
+    /**
+     * SSL Keystore password.
+     */
+    public static final String KS_PASSWD = "vfs.ssl.kspassword";
+
+    /**
+     * SSL Truststore password.
+     */
+    public static final String TS_PASSWD = "vfs.ssl.tspassword";
+
+    /**
+     * SSL Key password.
+     */
+    public static final String KEY_PASSWD = "vfs.ssl.keypassword";
+
+    /**
+     * Passive mode
+     */
+    public static final String PASSIVE_MODE = "vfs.passive";
+
+    /**
+     * FTPS implicit mode
+     */
+    public static final String IMPLICIT_MODE = "vfs.implicit";
+
+    public static final String PROTECTION_MODE = "vfs.protection";
+
+    public static final String ENCRYPTION_ENABLED = "vfs.EncryptionEnabled";
+
+    public static final String DISK_SHARE_ACCESS_MASK = "vfs.diskShareAccessMask";
+
+    public static final String DISK_SHARE_ACCESS_MASK_MAX_ALLOWED = "MAXIMUM_ALLOWED";
+
+
+    public static final String FAIL_FILE_SUFFIX = ".fail";
+    public static final String STR_SPLITER = ":";
+    public static final String LOCK_FILE_SUFFIX = ".lock";
 
 }

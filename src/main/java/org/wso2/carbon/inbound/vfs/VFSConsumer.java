@@ -1,3 +1,21 @@
+/*
+ *  Copyright (c) 2025, WSO2 LLC. (https://www.wso2.com).
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
 package org.wso2.carbon.inbound.vfs;
 
 import org.apache.commons.lang.StringUtils;
@@ -37,29 +55,27 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     private static final Log log = LogFactory.getLog(VFSConsumer.class);
     private static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
-
-    private boolean fileLock = true;
     private final VFSConfig vfsConfig;
     private final FileSystemManager fsManager;
-    private FileSystemOptions fso;
-
     private final FileSelector fileSelector;
     private final PreProcessingHandler preProcessingHandler;
     private final PostProcessingHandler postProcessingHandler;
     private final FileInjectHandler fileInjectHandler;
-
-    private boolean readSubDirectories = false;
     private final String name;
+    private ScheduledExecutorService retryScheduler;
+    private boolean fileLock = true;
+    private FileSystemOptions fso;
+    private boolean readSubDirectories = false;
     private boolean isClosed;
     private String replyFileURI;
     private String replyFileName;
     private boolean append = false;
     private boolean resolveHostsDynamically = false;
     private Long failedRecordNextRetryDuration = 30000L; // Default 30 seconds
-    private final ScheduledExecutorService retryScheduler;
     private boolean isMounted = false;
 
     private String fileURI;
+
     public VFSConsumer(Properties properties,
                        String name,
                        SynapseEnvironment synapseEnvironment,
@@ -160,9 +176,9 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.postProcessingHandler = new PostProcessingHandler();
         int actionAfterProcess = vfsConfig.getActionAfterProcess();
         this.postProcessingHandler.setOnSuccessAction(Utils.getActionAfterProcess(vfsConfig, actionAfterProcess,
-                vfsConfig.getMoveAfterProcess(),fsManager));
+                vfsConfig.getMoveAfterProcess(), fsManager));
         this.postProcessingHandler.setOnFailAction(Utils.getActionAfterProcess(vfsConfig,
-                vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure(),fsManager));
+                vfsConfig.getActionAfterFailure(), vfsConfig.getMoveAfterFailure(), fsManager));
 
         this.fileSelector = new FileSelector(vfsConfig, fsManager);
         this.name = name;
@@ -204,12 +220,15 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.failedRecordNextRetryDuration = vfsConfig.getFailedRecordNextRetryDuration();
 
         if (log.isDebugEnabled()) {
-            log.debug("VFS Consumer initialized with features" );
+            log.debug("VFS Consumer initialized with features");
         }
     }
 
     @Override
     public Object poll() {
+        if (isClosed) {
+            return  null;
+        }
 
         if (log.isDebugEnabled()) {
             log.debug("Polling VFS location: " + maskURLPassword(fileURI) +
@@ -244,21 +263,14 @@ public class VFSConsumer extends GenericPollingConsumer {
         return null;
     }
 
-    @Override
-    public void resume() {
-
-    }
-
-    @Override
-    public void pause() {
-
-    }
-
     /* =========================
        Directory & File Handling
        ========================= */
 
     private void processDirectory(FileObject dir) throws FileSystemException {
+        if (isClosed) {
+            return;
+        }
         FileObject[] children = null;
         int processCount = 0;
         try {
@@ -279,6 +291,9 @@ public class VFSConsumer extends GenericPollingConsumer {
             children = Utils.sortFileObjects(children, fileSortParam, vfsConfig);
         }
         for (FileObject child : children) {
+            if(isClosed) {
+                return;
+            }
             try {
                 // Skip lock/fail markers
                 String base = child.getName().getBaseName();
@@ -310,7 +325,7 @@ public class VFSConsumer extends GenericPollingConsumer {
                             processFile(child);
                             Thread.sleep(vfsConfig.getFileProcessingInterval());
                         } catch (InterruptedException ignore) {
-                            if(log.isDebugEnabled()) {
+                            if (log.isDebugEnabled()) {
                                 log.debug("File processing sleep interrupted");
                             }
                             Thread.currentThread().interrupt();
@@ -347,6 +362,9 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     private void processFile(FileObject file) throws FileSystemException {
+        if (isClosed) {
+            return;
+        }
         // Check if file is still uploading (size checking with MD5)
         if (isFileStillUploading(file)) {
             if (log.isDebugEnabled()) {
@@ -366,15 +384,13 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Acquire lock if file locking is enabled
         fileLock = vfsConfig.isFileLocking();
         LockManager lockManager = new LockManager(fileLock, vfsConfig,
-                fsManager, fso, vfsConfig.isClusterAware());
+                fsManager, fso);
 
         if (fileLock && !lockManager.acquireLock(file)) {
             log.error("Couldn't get the lock for processing the file: " +
                     maskURLPassword(file.getName().toString()));
             return;
         }
-
-//        boolean skipUnlock = false;
 
         try {
             // Pre-processing hook (e.g., acquire lock, tmp rename, etc.)
@@ -430,7 +446,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                 log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
                 // Mark as failed record if we couldn't handle the failure
                 Utils.markFailRecord(fsManager, file, fso);
-//                skipUnlock = true;
             }
         } finally {
             // Release lock if file locking is enabled and we shouldn't skip
@@ -453,41 +468,6 @@ public class VFSConsumer extends GenericPollingConsumer {
             if (log.isDebugEnabled()) {
                 log.debug("Scheduled retry for failed record: " + maskURLPassword(file.toString()) +
                         " after " + failedRecordNextRetryDuration + "ms");
-            }
-        }
-    }
-
-    /**
-     * Task to retry processing of failed records
-     */
-    private class FailedRecordRetryTask implements Runnable {
-        private final FileObject file;
-
-        public FailedRecordRetryTask(FileObject file) {
-            this.file = file;
-        }
-
-        @Override
-        public void run() {
-            try {
-                if (log.isDebugEnabled()) {
-                    log.debug("Retrying failed record: " + maskURLPassword(file.toString()));
-                }
-
-                // Check if file still exists
-                if (file.exists()) {
-                    // Remove from failed records and retry processing
-                    removeFromFailedRecords(file);
-                    processFile(file);
-                } else {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Failed record file no longer exists: " + maskURLPassword(file.toString()));
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Error during failed record retry: " + maskURLPassword(file.toString()), e);
-                // Schedule another retry if configured
-                scheduleFailedRecordRetry(file);
             }
         }
     }
@@ -602,23 +582,18 @@ public class VFSConsumer extends GenericPollingConsumer {
         return uri;
     }
 
+    private void safeClose(FileObject fo) {
+        if (fo != null) {
+            try {
+                fo.close();
+            } catch (Exception ignore) {
+            }
+        }
+    }
+
     /* =========================
                 Helpers
        ========================= */
-
-    private void safeClose(FileObject fo) {
-        if (fo != null) {
-            try { fo.close(); } catch (Exception ignore) {}
-        }
-    }
-
-    private static class ResolvedFileUri {
-        final String resolvedUri;
-        final boolean supportSubDirectories;
-        ResolvedFileUri(String uri, boolean subDirs) {
-            this.resolvedUri = uri; this.supportSubDirectories = subDirs;
-        }
-    }
 
     private ResolvedFileUri extractFileUri(String propertyForUri) {
         String definedFileUri;
@@ -658,8 +633,7 @@ public class VFSConsumer extends GenericPollingConsumer {
                     log.error("fileObject is null");
                     throw new FileSystemException("fileObject is null");
                 }
-                // TODO: Mount Get if the file location is volume mounted
-                Map<String,String> queryParams = UriParser.extractQueryParams(fileURI);
+                Map<String, String> queryParams = UriParser.extractQueryParams(fileURI);
                 isMounted = Boolean.parseBoolean(queryParams.get(VFSConstants.IS_MOUNTED));
                 fileObject.setIsMounted(isMounted);
                 wasError = false;
@@ -705,8 +679,72 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     public void destroy() {
-        fsManager.close();
+//        fsManager.close();
         this.close();
+    }
+
+    private static class ResolvedFileUri {
+        final String resolvedUri;
+        final boolean supportSubDirectories;
+
+        ResolvedFileUri(String uri, boolean subDirs) {
+            this.resolvedUri = uri;
+            this.supportSubDirectories = subDirs;
+        }
+    }
+
+    /**
+     * Task to retry processing of failed records
+     */
+    private class FailedRecordRetryTask implements Runnable {
+        private final FileObject file;
+
+        public FailedRecordRetryTask(FileObject file) {
+            this.file = file;
+        }
+
+        @Override
+        public void run() {
+            try {
+                if (log.isDebugEnabled()) {
+                    log.debug("Retrying failed record: " + maskURLPassword(file.toString()));
+                }
+
+                // Check if file still exists
+                if (file.exists()) {
+                    // Remove from failed records and retry processing
+                    removeFromFailedRecords(file);
+                    processFile(file);
+                } else {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Failed record file no longer exists: " + maskURLPassword(file.toString()));
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error during failed record retry: " + maskURLPassword(file.toString()), e);
+                // Schedule another retry if configured
+                scheduleFailedRecordRetry(file);
+            }
+        }
+    }
+
+
+    @Override
+    public void resume() {
+        try {
+            ((StandardFileSystemManager) fsManager).init();
+            retryScheduler = Executors.newScheduledThreadPool(1);
+            isClosed = false;
+        } catch (FileSystemException e) {
+            log.error("Error re-initializing VFS FileSystemManager on resume", e);
+        }
+    }
+
+    @Override
+    public void pause() {
+        isClosed = true;
+        fsManager.close();
+        retryScheduler.shutdown();
     }
 
 }
