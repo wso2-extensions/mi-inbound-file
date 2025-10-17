@@ -46,7 +46,7 @@ public class SizeCheckFilter implements Filter {
     @Override
     public boolean accept(FileObject fileObject) {
         try {
-            return isFileStillUploading(fileObject);
+            return !isFileStillUploading(fileObject);
         } catch (Exception e) {
             return false;
         }
