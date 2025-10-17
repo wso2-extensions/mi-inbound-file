@@ -34,14 +34,14 @@ public class PostProcessingHandler implements PostProcessor {
     @Override
     public void onSuccess(FileObject fileObject) throws Exception {
 
-        if (onSuccessAction !=null) {
+        if (onSuccessAction != null) {
             onSuccessAction.execute(fileObject);
         }
     }
 
     @Override
     public void onFail(FileObject fileObject) throws Exception {
-        if (onFailAction!=null) {
+        if (onFailAction != null) {
             onFailAction.execute(fileObject);
         }
     }

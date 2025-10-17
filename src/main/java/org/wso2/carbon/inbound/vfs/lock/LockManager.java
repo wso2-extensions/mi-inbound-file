@@ -45,12 +45,13 @@ import static org.wso2.carbon.inbound.vfs.VFSConstants.STR_SPLITER;
 public class LockManager {
     private static final Log log = LogFactory.getLog(LockManager.class);
     private static final Random randomNumberGenerator = new Random();
+    private final FileSystemManager fsManager;
+    private final FileSystemOptions fso;
     private boolean fileLock;
     private boolean autoLockRelease;
     private boolean autoLockReleaseSameNode;
     private long autoLockReleaseInterval;
-    private final FileSystemManager fsManager;
-    private final FileSystemOptions fso;
+
     public LockManager(boolean fileLock, VFSConfig vfsConfig,
                        FileSystemManager fsManager,
                        FileSystemOptions fso) {
@@ -87,7 +88,7 @@ public class LockManager {
             return false;
         }
 
-        return acquireLock(fsManager, fileObject,  fso, true);
+        return acquireLock(fsManager, fileObject, fso, true);
     }
 
 
@@ -96,16 +97,13 @@ public class LockManager {
      * the file is not processed while it is being uploaded and/or the item is
      * not processed by two listeners
      *
-     * @param fsManager
-     *            used to resolve the processing file
-     * @param fo
-     *            representing the processing file item
-     * @param fso
-     *            represents file system options used when resolving file from file system manager.
+     * @param fsManager used to resolve the processing file
+     * @param fo        representing the processing file item
+     * @param fso       represents file system options used when resolving file from file system manager.
      * @return boolean true if the lock has been acquired or false if not
      */
-    public  synchronized boolean acquireLock(FileSystemManager fsManager, FileObject fo,
-                                                   FileSystemOptions fso, boolean isListener) {
+    public synchronized boolean acquireLock(FileSystemManager fsManager, FileObject fo,
+                                            FileSystemOptions fso, boolean isListener) {
         String strLockValue = getLockValue();
         byte[] lockValue = strLockValue.getBytes();
         FileObject lockObject = null;
@@ -121,7 +119,7 @@ public class LockManager {
                         + maskURLPassword(fo.getName().getURI())
                         + ". This could possibly be due to some other party already "
                         + "processing this file or the file is still being uploaded");
-                if(autoLockRelease){
+                if (autoLockRelease) {
                     releaseLock(lockValue, strLockValue, lockObject, autoLockReleaseSameNode,
                             autoLockReleaseInterval);
                 }
@@ -171,6 +169,7 @@ public class LockManager {
     /**
      * Generate a random lock value to ensure that there are no two parties processing the same file
      * Lock format random:hostname:hostip:time
+     *
      * @return lock value as a string
      */
     private String getLockValue() {
@@ -192,7 +191,7 @@ public class LockManager {
     }
 
     private void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject,
-                                    Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {
+                             Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {
         try {
             InputStream is = lockObject.getContent().getInputStream();
             byte[] val = new byte[bLockValue.length];
@@ -245,7 +244,7 @@ public class LockManager {
         return true;
     }
 
-    private  void deleteLockFile(FileObject lockObject, Long autoLockReleaseInterval, long lInterval)
+    private void deleteLockFile(FileObject lockObject, Long autoLockReleaseInterval, long lInterval)
             throws FileSystemException {
         if (autoLockReleaseInterval == null || autoLockReleaseInterval <= lInterval) {
             try {
@@ -259,7 +258,7 @@ public class LockManager {
     }
 
 
-    private  boolean verifyLock(byte[] lockValue, FileObject lockObject) {
+    private boolean verifyLock(byte[] lockValue, FileObject lockObject) {
         try {
             InputStream is = lockObject.getContent().getInputStream();
             byte[] val = new byte[lockValue.length];
@@ -293,15 +292,17 @@ public class LockManager {
     }
 
     private boolean canReleaseLock(String[] oldLock, String[] newLock) {
-        if (!autoLockReleaseSameNode) { return true;}
+        if (!autoLockReleaseSameNode) {
+            return true;
+        }
 
-        return oldLock.length ==4 && newLock.length ==4 && oldLock[1].equals(newLock[1]) && oldLock[2].equals(newLock[2]);
+        return oldLock.length == 4 && newLock.length == 4 && oldLock[1].equals(newLock[1]) && oldLock[2].equals(newLock[2]);
     }
 
     /**
      * Release a file item lock acquired either by the VFS listener or a sender
      *
-     * @param fo        representing the processed file
+     * @param fo representing the processed file
      */
     public void releaseLock(FileObject fo) {
         String fullPath = fo.getName().getURI();

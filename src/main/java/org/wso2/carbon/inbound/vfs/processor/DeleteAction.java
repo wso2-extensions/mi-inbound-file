@@ -24,7 +24,7 @@ import org.wso2.org.apache.commons.vfs2.FileSystemException;
 /**
  * Action to delete the file after processing.
  */
-public class DeleteAction implements Action{
+public class DeleteAction implements Action {
 
     @Override
     public void execute(FileObject fileObject) throws FileSystemException {

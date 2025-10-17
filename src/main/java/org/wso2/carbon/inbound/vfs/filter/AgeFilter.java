@@ -28,9 +28,8 @@ import org.wso2.org.apache.commons.vfs2.FileSystemException;
  * Filter to filter files based on age.
  */
 public class AgeFilter implements Filter {
-    private Log log = LogFactory.getLog(AgeFilter.class);
-
     VFSConfig vfsConfig;
+    private Log log = LogFactory.getLog(AgeFilter.class);
 
     public AgeFilter(VFSConfig vfsConfig) {
         this.vfsConfig = vfsConfig;

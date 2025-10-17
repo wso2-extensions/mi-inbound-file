@@ -47,111 +47,106 @@ public class VFSConfig {
 
     // operation after scan
     public static final int DELETE = 0;
-    public static final int MOVE   = 1;
-    public static final int NONE   = 2;
+    public static final int MOVE = 1;
+    public static final int NONE = 2;
     private static final long FILE_SIZE_CHECK_INTERVAL_DEFAULT = 1000L;
-
-    /** File or Directory to scan */
+    private static final Log log = LogFactory.getLog(VFSConfig.class);
+    /**
+     * File or Directory to scan
+     */
     private String fileURI;
-    /** The URI to send replies to. May be null. */
+    /**
+     * The URI to send replies to. May be null.
+     */
     private String replyFileURI;
     private String replayFileName;
-
-    /** file name pattern for a directory or compressed file entry */
+    /**
+     * file name pattern for a directory or compressed file entry
+     */
     private String fileNamePattern;
-    /** Content-Type to use for the message */
+    /**
+     * Content-Type to use for the message
+     */
     private String contentType;
-
-    /** Should the last updated time timestamp be updated */
+    /**
+     * Should the last updated time timestamp be updated
+     */
     private boolean updateLastModified;
-
-    /** action to take after a successful poll */
+    /**
+     * action to take after a successful poll
+     */
     private int actionAfterProcess = DELETE;
-    /** action to take after a poll with errors */
+    /**
+     * action to take after a poll with errors
+     */
     private int actionAfterErrors = DELETE;
-    /** action to take after a failed poll */
+    /**
+     * action to take after a failed poll
+     */
     private int actionAfterFailure = DELETE;
-
-    /** where to move the file after processing */
+    /**
+     * where to move the file after processing
+     */
     private String moveAfterProcess;
-    /** where to move the file after encountering some errors */
+    /**
+     * where to move the file after encountering some errors
+     */
     private String moveAfterErrors;
-    /** where to move the file after total failure */
+    /**
+     * where to move the file after total failure
+     */
     private String moveAfterFailure;
-    /** moved file will have this formatted timestamp prefix */    
+    /**
+     * moved file will have this formatted timestamp prefix
+     */
     private DateFormat moveTimestampFormat;
-
-    /** containing the time in [ms] between the size check on files (to avoid reading files which are currently written) */
+    /**
+     * containing the time in [ms] between the size check on files (to avoid reading files which are currently written)
+     */
     private long checkSizeInterval;
-    /** does the checkSize Lock mechanisme take empty files or not, default = false */
+    /**
+     * does the checkSize Lock mechanisme take empty files or not, default = false
+     */
     private boolean checkSizeIgnoreEmpty;
-
-
     private boolean streaming;
     private boolean build;
-
     private int maxRetryCount;
     private long reconnectTimeout;
     private boolean fileLocking;
-
     private CryptoUtil cryptoUtil;
     private Properties secureVaultProperties;
-
     /**
      * Only files smaller than this limit will get processed, it can be configured with param
      * "transport.vfs.FileSizeLimit", and this will have default value -1 which means unlimited file size
      * This should be specified in bytes
      */
     private double fileSizeLimit = VFSConstants.DEFAULT_TRANSPORT_FILE_SIZE_LIMIT;
-
     private String moveAfterMoveFailure;
-
     private int nextRetryDurationForFailedMove;
-
     private String failedRecordFileName;
-
     private String failedRecordFileDestination;
-
     private String failedRecordTimestampFormat;
-
     private Integer fileProcessingInterval;
-    
     private Integer fileProcessingCount;
-
     private Map<String, String> vfsSchemeProperties;
     private boolean autoLockRelease;
-
     private Long autoLockReleaseInterval;
-
-    private Boolean autoLockReleaseSameNode;   
-    
+    private Boolean autoLockReleaseSameNode;
     private boolean distributedLock;
-    
     private String fileSortParam;
-    
     private boolean fileSortAscending;
-    
     private boolean forceCreateFolder;
-    
     private String subfolderTimestamp;
-    
     private Long distributedLockTimeout;
-
     private volatile boolean canceled;
-
     private boolean clusterAware;
-
     /**
      * This parameter is used decide whether the resolving hostname IP of URIs are done at deployment or dynamically.
      * At usage default id 'false' which lead hostname resolution at deployment
      */
     private boolean resolveHostsDynamically = false;
     private boolean fileNotFoundLogged = false;
-
     private ParameterInclude params;
-
-    private static final Log log = LogFactory.getLog(VFSConfig.class);
-    
     private Long minimumAge = null; //defines a minimum age of a file before being consumed. Use to avoid just written files to be consumed
     private Long maximumAge = null; //defines a maximum age of a file being consumed. Old files will stay in the directory
     private boolean append;
@@ -163,7 +158,7 @@ public class VFSConfig {
         // Basic URIs
         this.fileURI = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_URI);
         this.replyFileURI = properties.getProperty(VFSConstants.REPLY_FILE_URI);
-        this.replayFileName   = properties.getProperty(VFSConstants.REPLY_FILE_NAME);
+        this.replayFileName = properties.getProperty(VFSConstants.REPLY_FILE_NAME);
         this.fileNamePattern = properties.getProperty(VFSConstants.TRANSPORT_FILE_FILE_NAME_PATTERN);
         this.contentType = properties.getProperty(VFSConstants.TRANSPORT_FILE_CONTENT_TYPE);
 
@@ -337,7 +332,7 @@ public class VFSConfig {
                 VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.WARN, message, e);
             }
         }
-        return  fileURI;
+        return fileURI;
     }
 
     public boolean isClusterAware() {

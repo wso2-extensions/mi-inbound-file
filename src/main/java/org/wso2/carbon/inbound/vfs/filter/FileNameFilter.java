@@ -29,6 +29,7 @@ import java.util.logging.Logger;
 public class FileNameFilter implements Filter {
     Logger logger = Logger.getLogger(FileNameFilter.class.getName());
     VFSConfig vfsConfig;
+
     public FileNameFilter(VFSConfig vfsConfig) {
         this.vfsConfig = vfsConfig;
     }

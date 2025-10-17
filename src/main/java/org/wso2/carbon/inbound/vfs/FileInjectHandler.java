@@ -36,19 +36,17 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.SynapseConstants;
 import org.apache.synapse.SynapseException;
 import org.apache.synapse.commons.vfs.VFSConstants;
-import org.apache.synapse.commons.vfs.VFSOutTransportInfo;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.inbound.InboundEndpoint;
 import org.apache.synapse.mediators.base.SequenceMediator;
 import org.apache.synapse.transport.customlogsetter.CustomLogSetter;
 import org.wso2.org.apache.commons.vfs2.FileObject;
 
+import javax.mail.internet.ContentType;
+import javax.mail.internet.ParseException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
-
-import javax.mail.internet.ContentType;
-import javax.mail.internet.ParseException;
 
 import static org.apache.axis2.context.MessageContext.TRANSPORT_HEADERS;
 

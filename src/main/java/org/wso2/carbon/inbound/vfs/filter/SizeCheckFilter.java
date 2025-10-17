@@ -18,11 +18,10 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.wso2.carbon.inbound.vfs.Utils;
+import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 
@@ -33,11 +32,12 @@ import java.security.MessageDigest;
  * Filter to filter files based on file size checking.
  */
 public class SizeCheckFilter implements Filter {
+    public static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
+    public static final String MD5 = "MD5";
     Log log = LogFactory.getLog(SizeCheckFilter.class.getName());
     VFSConfig vfsConfig;
     FileSystemManager fsManager;
-    public static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
-    public static final String MD5 = "MD5";
+
     public SizeCheckFilter(VFSConfig vfsConfig, FileSystemManager fsManager) {
         this.vfsConfig = vfsConfig;
         this.fsManager = fsManager;
@@ -54,21 +54,21 @@ public class SizeCheckFilter implements Filter {
 
 
     private boolean isFileStillUploading(FileObject child) {
-        if(vfsConfig.getCheckSizeIgnoreEmpty() && vfsConfig.getCheckSizeInterval() > 0) {
+        if (vfsConfig.getCheckSizeIgnoreEmpty() && vfsConfig.getCheckSizeInterval() > 0) {
             //CheckEmpty and CheckSize are not active - return false (file is not uploading)
             return false;
         }
         InputStream inputStream = null;
         try {
             //get first MD5
-            log.debug("Create MD5 Checksum of File: "+ Utils.maskURLPassword(child.getName().toString()));
+            log.debug("Create MD5 Checksum of File: " + Utils.maskURLPassword(child.getName().toString()));
             inputStream = child.getContent().getInputStream();
             String md5 = getMD5Checksum(inputStream);
             return isFileEmpty(md5) || isFileStillChangingSize(child, md5);
         } catch (Exception e) {
             return true;
         } finally {
-            if(inputStream != null){
+            if (inputStream != null) {
                 try {
                     inputStream.close();
                 } catch (Exception ignored) {
@@ -91,12 +91,12 @@ public class SizeCheckFilter implements Filter {
             long checkSizeInterval = vfsConfig.getCheckSizeInterval();
 
             //wait interval time
-            log.debug("Check if file is still uploading. Now sleep "+checkSizeInterval+" ms");
+            log.debug("Check if file is still uploading. Now sleep " + checkSizeInterval + " ms");
             Thread.sleep(checkSizeInterval);
             String md5AfterSleep = getMD5Checksum(child);
             if (!md5.equals(md5AfterSleep)) {
                 //file is still uploading
-                log.debug("File is still uploading. md5 Hashcode Before="+md5 + " After="+md5AfterSleep);
+                log.debug("File is still uploading. md5 Hashcode Before=" + md5 + " After=" + md5AfterSleep);
                 return true;
             }
         } catch (Exception e) {

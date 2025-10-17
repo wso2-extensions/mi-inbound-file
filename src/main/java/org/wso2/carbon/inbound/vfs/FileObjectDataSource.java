@@ -18,12 +18,13 @@
 
 package org.wso2.carbon.inbound.vfs;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import org.apache.axiom.attachments.SizeAwareDataSource;
 import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.FileSystemException;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * A DataSource implementation to wrap a VFS FileObject.

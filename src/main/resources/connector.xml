@@ -14,7 +14,7 @@
    under the License.
 -->
 <connector>
-    <component name="fileInbound" package="org.wso2.integration.inbound" >
+    <component name="fileInbound" package="org.wso2.integration.inbound">
         <description>WSO2 VFS Inbound Endpoint</description>
     </component>
 </connector>

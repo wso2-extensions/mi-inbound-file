@@ -20,12 +20,11 @@ package org.wso2.carbon.inbound.vfs.filter;
 
 import org.apache.commons.lang.StringUtils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
+import org.wso2.org.apache.commons.vfs2.FileObject;
+import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.commons.logging.Log;
-import org.wso2.org.apache.commons.vfs2.FileObject;
-import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 
 /**
  * Class to select files based on multiple filters.
@@ -33,6 +32,7 @@ import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 public class FileSelector {
 
     private final List<Filter> filters;
+
     public FileSelector(VFSConfig config, FileSystemManager fsManager) {
         filters = new ArrayList<>();
         if (StringUtils.isNotEmpty(config.getFileNamePattern())) {
@@ -44,7 +44,7 @@ public class FileSelector {
         if (config.getCheckSizeInterval() > 0) {
             filters.add(new SizeCheckFilter(config, fsManager));
         }
-        if ((config.getMaximumAge() != null) || (config.getMinimumAge()!= null)) {
+        if ((config.getMaximumAge() != null) || (config.getMinimumAge() != null)) {
             filters.add(new AgeFilter(config));
         }
     }

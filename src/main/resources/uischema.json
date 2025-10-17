@@ -47,7 +47,11 @@
               "inputType": "keyOrExpression",
               "keyType": "sequence",
               "required": "true",
-              "enableCondition": [{"generateSequences":false}]
+              "enableCondition": [
+                {
+                  "generateSequences": false
+                }
+              ]
             }
           },
           {
@@ -58,7 +62,11 @@
               "inputType": "keyOrExpression",
               "keyType": "sequence",
               "required": "true",
-              "enableCondition": [{"generateSequences":false}]
+              "enableCondition": [
+                {
+                  "generateSequences": false
+                }
+              ]
             }
           },
           {

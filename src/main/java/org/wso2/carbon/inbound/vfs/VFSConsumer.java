@@ -38,10 +38,8 @@ import org.wso2.org.apache.commons.vfs2.cache.NullFilesCache;
 import org.wso2.org.apache.commons.vfs2.impl.StandardFileSystemManager;
 import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -57,12 +55,12 @@ public class VFSConsumer extends GenericPollingConsumer {
     private static final Log log = LogFactory.getLog(VFSConsumer.class);
     private static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
     private final VFSConfig vfsConfig;
-    private FileSystemManager fsManager = null;
     private final FileSelector fileSelector;
     private final PreProcessingHandler preProcessingHandler;
     private final PostProcessingHandler postProcessingHandler;
     private final FileInjectHandler fileInjectHandler;
     private final String name;
+    private FileSystemManager fsManager = null;
     private ScheduledExecutorService retryScheduler;
     private boolean fileLock = true;
     private FileSystemOptions fso;
@@ -162,7 +160,7 @@ public class VFSConsumer extends GenericPollingConsumer {
             mgr.init();
             this.fsManager = mgr;
         } catch (FileSystemException e) {
-           VFSTransportErrorHandler.handleException(log, "Error initializing VFS FileSystemManager", e);
+            VFSTransportErrorHandler.handleException(log, "Error initializing VFS FileSystemManager", e);
         }
 
         this.fso = null;
@@ -230,7 +228,7 @@ public class VFSConsumer extends GenericPollingConsumer {
     @Override
     public Object poll() {
         if (isClosed) {
-            return  null;
+            return null;
         }
 
         if (log.isDebugEnabled()) {
@@ -295,7 +293,7 @@ public class VFSConsumer extends GenericPollingConsumer {
             children = Utils.sortFileObjects(children, fileSortParam, vfsConfig);
         }
         for (FileObject child : children) {
-            if(isClosed) {
+            if (isClosed) {
                 return;
             }
             try {
@@ -636,6 +634,24 @@ public class VFSConsumer extends GenericPollingConsumer {
         this.close();
     }
 
+    @Override
+    public void resume() {
+        try {
+            ((StandardFileSystemManager) fsManager).init();
+            retryScheduler = Executors.newScheduledThreadPool(1);
+            isClosed = false;
+        } catch (FileSystemException e) {
+            log.error("Error re-initializing VFS FileSystemManager on resume", e);
+        }
+    }
+
+    @Override
+    public void pause() {
+        isClosed = true;
+        fsManager.close();
+        retryScheduler.shutdown();
+    }
+
     private static class ResolvedFileUri {
         final String resolvedUri;
         final boolean supportSubDirectories;
@@ -678,25 +694,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                 scheduleFailedRecordRetry(file);
             }
         }
-    }
-
-
-    @Override
-    public void resume() {
-        try {
-            ((StandardFileSystemManager) fsManager).init();
-            retryScheduler = Executors.newScheduledThreadPool(1);
-            isClosed = false;
-        } catch (FileSystemException e) {
-            log.error("Error re-initializing VFS FileSystemManager on resume", e);
-        }
-    }
-
-    @Override
-    public void pause() {
-        isClosed = true;
-        fsManager.close();
-        retryScheduler.shutdown();
     }
 
 }

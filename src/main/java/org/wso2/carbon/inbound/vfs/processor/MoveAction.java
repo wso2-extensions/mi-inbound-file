@@ -41,6 +41,7 @@ import static org.wso2.carbon.inbound.vfs.Utils.sanitizeFileUriWithSub;
  */
 public class MoveAction implements Action {
 
+    private final Log log = LogFactory.getLog(MoveAction.class);
     String targetLocation;
     VFSConfig vfsConfig;
     FileSystemManager fsManager;
@@ -50,8 +51,6 @@ public class MoveAction implements Action {
         this.vfsConfig = vfsConfig;
         this.fsManager = fsManager;
     }
-
-    private final Log log = LogFactory.getLog(MoveAction.class);
 
     @Override
     public void execute(FileObject fileObject) throws FileSystemException {
@@ -92,7 +91,7 @@ public class MoveAction implements Action {
 
             if (vfsConfig.getMoveTimestampFormat() != null) {
                 DateFormat moveTimestampFormat = vfsConfig.getMoveTimestampFormat();
-                dest = fileObject.resolveFile( moveTimestampFormat + "_" + fileObject.getName().getBaseName());
+                dest = fileObject.resolveFile(moveTimestampFormat + "_" + fileObject.getName().getBaseName());
             }
 
             fileObject.moveTo(dest);

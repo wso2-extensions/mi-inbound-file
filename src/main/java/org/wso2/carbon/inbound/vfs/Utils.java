@@ -64,7 +64,6 @@ import static org.wso2.carbon.inbound.vfs.VFSConstants.IMPLICIT_MODE;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.KEY_PASSWD;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.KEY_STORE;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.KS_PASSWD;
-import static org.wso2.carbon.inbound.vfs.VFSConstants.LOCK_FILE_SUFFIX;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.PASSIVE_MODE;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.PASSWORD_PATTERN;
 import static org.wso2.carbon.inbound.vfs.VFSConstants.PROTECTION_MODE;
@@ -573,7 +572,6 @@ public class Utils {
         }
         return uri;
     }
-
 
 
     public static String stripVfsSchemeIfPresent(String uri) {

@@ -84,7 +84,7 @@ public class VFSConstants {
 
     /**
      * File Sorting Parameter and values
-     * */
+     */
     public static final String FILE_SORT_PARAM = "transport.vfs.FileSortAttribute";
     public static final String FILE_SORT_VALUE_NAME = "Name";
     public static final String FILE_SORT_VALUE_SIZE = "Size";
@@ -145,41 +145,41 @@ public class VFSConstants {
 
     /**
      * This specify the interval between files processed (in milliseconds)
-     * */
+     */
     public static final String TRANSPORT_FILE_INTERVAL = "transport.vfs.FileProcessInterval";
     /**
      * This specify the file count that will be processed in a cycle/batch
-     * */
+     */
     public static final String TRANSPORT_FILE_COUNT = "transport.vfs.FileProcessCount";
 
     /**
      * Lock release true/false
-     * */
+     */
     public static final String TRANSPORT_AUTO_LOCK_RELEASE = "transport.vfs.AutoLockRelease";
 
     /**
      * Lock release interval
-     * */
+     */
     public static final String TRANSPORT_AUTO_LOCK_RELEASE_INTERVAL = "transport.vfs.AutoLockReleaseInterval";
 
     /**
      * Lock release same node
-     * */
+     */
     public static final String TRANSPORT_AUTO_LOCK_RELEASE_SAME_NODE = "transport.vfs.LockReleaseSameNode";
 
     /**
      * Distributed Lock enable/disable
-     * */
+     */
     public static final String TRANSPORT_DISTRIBUTED_LOCK = "transport.vfs.DistributedLock";
 
     /**
      * Fully build the file
-     * */
+     */
     public static final String TRANSPORT_BUILD = "transport.vfs.Build";
 
     /**
      * Distributed Lock timeout
-     * */
+     */
     public static final String TRANSPORT_DISTRIBUTED_LOCK_TIMEOUT = "transport.vfs.DistributedTimeout";
 
     public static final String FAILED_RECORD_DELIMITER = " ";
@@ -206,77 +206,63 @@ public class VFSConstants {
 
     // smb scheme
     public static final String SCHEME_SMB2 = "smb2";
-
-
-    // sftp scheme file option list
-    public static enum SFTP_FILE_OPTION {Identities, UserDirIsRoot, IdentityPassPhrase};
-
-    /** Parameter for minimum age **/
+    /**
+     * Parameter for minimum age
+     **/
     public static final String TRANSPORT_FILE_MINIMUM_AGE = "transport.vfs.MinimumAge";
-    /** Parameter for maximum age **/
-    public static final String TRANSPORT_FILE_MAXIMUM_AGE = "transport.vfs.MaximumAge";
 
+    ;
+    /**
+     * Parameter for maximum age
+     **/
+    public static final String TRANSPORT_FILE_MAXIMUM_AGE = "transport.vfs.MaximumAge";
     public static final String FILE_TYPE_PREFIX = "transport.vfs.fileType";
     public static final String FILE_TYPE = "filetype";
     public static final String BINARY_TYPE = "BINARY";
     public static final String LOCAL_TYPE = "LOCAL";
     public static final String ASCII_TYPE = "ASCII";
     public static final String EBCDIC_TYPE = "EBCDIC";
-
     public static final String CLUSTER_AWARE = "transport.vfs.ClusterAware";
-
     // The waiting time of the file before picking it up (in milliseconds)
     public static final String WAIT_TIME_BEFORE_READ = "transport.vfs.waitTimeBeforeRead";
-
     public static final Pattern URL_PATTERN = Pattern.compile("[a-zA-Z0-9]+://.*");
     public static final Pattern PASSWORD_PATTERN = Pattern.compile(":(?:[^/]+)@");
-
     /**
      * SSL Keystore.
      */
     public static final String KEY_STORE = "vfs.ssl.keystore";
-
     /**
      * SSL Truststore.
      */
     public static final String TRUST_STORE = "vfs.ssl.truststore";
-
     /**
      * SSL Keystore password.
      */
     public static final String KS_PASSWD = "vfs.ssl.kspassword";
-
     /**
      * SSL Truststore password.
      */
     public static final String TS_PASSWD = "vfs.ssl.tspassword";
-
     /**
      * SSL Key password.
      */
     public static final String KEY_PASSWD = "vfs.ssl.keypassword";
-
     /**
      * Passive mode
      */
     public static final String PASSIVE_MODE = "vfs.passive";
-
     /**
      * FTPS implicit mode
      */
     public static final String IMPLICIT_MODE = "vfs.implicit";
-
     public static final String PROTECTION_MODE = "vfs.protection";
-
     public static final String ENCRYPTION_ENABLED = "vfs.EncryptionEnabled";
-
     public static final String DISK_SHARE_ACCESS_MASK = "vfs.diskShareAccessMask";
-
     public static final String DISK_SHARE_ACCESS_MASK_MAX_ALLOWED = "MAXIMUM_ALLOWED";
-
-
     public static final String FAIL_FILE_SUFFIX = ".fail";
     public static final String STR_SPLITER = ":";
     public static final String LOCK_FILE_SUFFIX = ".lock";
+    // sftp scheme file option list
+    public static enum SFTP_FILE_OPTION {Identities, UserDirIsRoot, IdentityPassPhrase}
 
 }
