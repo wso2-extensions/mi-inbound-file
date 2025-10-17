@@ -1,0 +1,27 @@
+{
+  "name": "File Event Listener",
+  "owner": "WSO2",
+  "product": "MI",
+  "mavenGroupId": "org.wso2.integration.inbound",
+  "mavenArtifactId": "mi-inbound-file",
+  "rank": 15,
+  "type": "Inbound",
+  "category": "Developer Tools",
+  "documentationUrl": "",
+  "description": "File Event Listener",
+  "status": "Active",
+  "labels": [
+    "integration",
+    "communication",
+    "inbound-endpoint"
+  ],
+  "releases": [
+    {
+      "tagName": "v0.9.0",
+      "products": [
+        "MI 4.5.0"
+      ],
+      "connections": []
+    }
+  ]
+}

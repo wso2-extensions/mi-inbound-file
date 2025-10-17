@@ -1,0 +1,625 @@
+{
+  "name": "file",
+  "type": "event-integration",
+  "title": "File (Inbound)",
+  "id": "org.wso2.carbon.inbound.vfs.VFSConsumer",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Generic",
+        "isCollapsed": false,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "name",
+              "displayName": "Event Integration Name",
+              "inputType": "string",
+              "required": "true"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "class",
+              "displayName": "Class Name",
+              "inputType": "string",
+              "required": "true",
+              "hidden": true,
+              "defaultValue": "org.wso2.carbon.inbound.vfs.VFSConsumer"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "generateSequences",
+              "displayName": "Automatically generate sequences",
+              "inputType": "checkbox",
+              "defaultValue": true
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "sequence",
+              "displayName": "Injecting Sequence Name",
+              "inputType": "keyOrExpression",
+              "keyType": "sequence",
+              "required": "true",
+              "enableCondition": [
+                {
+                  "generateSequences": false
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "onError",
+              "displayName": "Error Sequence Name",
+              "inputType": "keyOrExpression",
+              "keyType": "sequence",
+              "required": "true",
+              "enableCondition": [
+                {
+                  "generateSequences": false
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "suspend",
+              "displayName": "Suspend Inbound",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "hidden": "true",
+              "required": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Basic",
+        "isCollapsed": false,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileURI",
+              "displayName": "File URI",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "scheduleType",
+              "displayName": "Schedule Type",
+              "inputType": "combo",
+              "defaultValue": "Polling",
+              "required": "true",
+              "helpTip": "The polling type for the connection.",
+              "comboValues": [
+                "Polling",
+                "Cron"
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "interval",
+              "displayName": "Polling Interval",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The interval for the connection.",
+              "enableCondition": [
+                {
+                  "scheduleType": "Polling"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cronExpression",
+              "displayName": "Cron Expression",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The cron for the connection.",
+              "enableCondition": [
+                {
+                  "scheduleType": "Cron"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ContentType",
+              "displayName": "Content-Type",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileNamePattern",
+              "displayName": "File Name Pattern",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "fileThrottlingType",
+              "displayName": "File Throttling Type",
+              "inputType": "combo",
+              "defaultValue": "Count",
+              "required": "true",
+              "helpTip": "Choose how file processing is controlled.",
+              "comboValues": [
+                "Count",
+                "Interval"
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileProcessCount",
+              "displayName": "File Process Count",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Maximum number of files to process in a single polling cycle.",
+              "enableCondition": [
+                {
+                  "fileThrottlingType": "Count"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileProcessInterval",
+              "displayName": "File Process Interval (ms)",
+              "inputType": "string",
+              "defaultValue": "0",
+              "required": "false",
+              "helpTip": "Delay (in milliseconds) between processing consecutive files.",
+              "enableCondition": [
+                {
+                  "fileThrottlingType": "Interval"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "sequential",
+              "displayName": "Sequential",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "coordination",
+              "displayName": "Coordination",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Actions",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ActionAfterProcess",
+              "displayName": "Action After Process",
+              "inputType": "combo",
+              "comboValues": [
+                "DELETE",
+                "MOVE"
+              ],
+              "defaultValue": "DELETE",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterProcess",
+              "displayName": "Move After Process",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterProcess": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveTimestampFormat",
+              "displayName": "Move Timestamp Format",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterProcess": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ActionAfterFailure",
+              "displayName": "Action After Process Failure",
+              "inputType": "combo",
+              "comboValues": [
+                "DELETE",
+                "MOVE"
+              ],
+              "defaultValue": "DELETE",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterFailure",
+              "displayName": "Move After Failure",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterFailure": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordsFileName",
+              "displayName": "Failed Records File Name",
+              "inputType": "string",
+              "defaultValue": "vfs-move-failed-records.properties",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordsFileDestination",
+              "displayName": "Failed Records File Destination",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterFailedMove",
+              "displayName": "Secondary Fallback Destination",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterFailure": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveFailedRecordTimestampFormat",
+              "displayName": "Move Failed Record Timestamp Format",
+              "inputType": "string",
+              "defaultValue": "dd-MM-yyyy HH:mm:ss",
+              "required": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Resilience",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MaxRetryCount",
+              "displayName": "Max Retry Count",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ReconnectTimeout",
+              "displayName": "Reconnect Timeout",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordNextRetryDuration",
+              "displayName": "Failed Record Next Retry Duration",
+              "inputType": "string",
+              "defaultValue": "3000",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.Locking",
+              "displayName": "Locking",
+              "inputType": "combo",
+              "comboValues": [
+                "enable",
+                "disable"
+              ],
+              "defaultValue": "enable",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.AutoLockRelease",
+              "displayName": "Auto Lock Release",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false",
+              "enableCondition": [
+                {
+                  "transport.vfs.Locking": "enable"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.AutoLockReleaseInterval",
+              "displayName": "Auto Lock Release Interval",
+              "inputType": "string",
+              "required": "true",
+              "defaultValue": "",
+              "enableCondition": [
+                {
+                  "transport.vfs.AutoLockRelease": true
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.LockReleaseSameNode",
+              "displayName": "Auto Lock Release Same Node",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "",
+              "enableCondition": [
+                {
+                  "transport.vfs.AutoLockRelease": true
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Other",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPIdentities",
+              "displayName": "SFTP Identities",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPIdentityPassPhrase",
+              "displayName": "SFTP Identity Pass Phrase",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPUserDirIsRoot",
+              "displayName": "SFTP User Directory Is Root",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileSortAttribute",
+              "displayName": "File Sort Attribute",
+              "inputType": "combo",
+              "comboValues": [
+                "NONE",
+                "Name",
+                "Size",
+                "Lastmodifiedtimestamp"
+              ],
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileSortAscending",
+              "displayName": "File Sort Ascending",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.CheckSizeIgnoreEmpty",
+              "displayName": "Ignore Empty Files During Size Check",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "When true, empty files are ignored during file size checks."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.CheckSizeInterval",
+              "displayName": "Size Check Interval (ms)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Duration in milliseconds between file size checks."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MinimumAge",
+              "displayName": "Minimum File Age (s)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Minimum age in seconds since the last modification before processing a file."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MaximumAge",
+              "displayName": "Maximum File Age (s)",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Maximum age in seconds since the last modification; older files will be skipped."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FileSizeLimit",
+              "displayName": "File Size Limit (bytes)",
+              "inputType": "string",
+              "defaultValue": "-1",
+              "required": "false",
+              "helpTip": "Process files whose size is ≤ this value (in bytes). Use -1 for unlimited."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SubFolderTimestampFormat",
+              "displayName": "Sub Folder Timestamp Format",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.Streaming",
+              "displayName": "Streaming",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.Build",
+              "displayName": "Build",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.UpdateLastModified",
+              "displayName": "Update Last Modified",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "false"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
