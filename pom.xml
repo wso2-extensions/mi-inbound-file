@@ -23,7 +23,7 @@
     </parent>
     <groupId>org.wso2.integration.inbound</groupId>
     <artifactId>mi-inbound-file</artifactId>
-    <version>0.9.0</version>
+    <version>0.9.1-SNAPSHOT</version>
     <name>File Event Listener</name>
 
     <properties>
@@ -42,7 +42,7 @@
         <developerConnection>
             scm:git:https://github.com/wso2-extensions/mi-inbound-file
         </developerConnection>
-        <tag>v1.4</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <dependencies>
