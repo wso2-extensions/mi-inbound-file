@@ -49,6 +49,7 @@ public class VFSConfig {
     public static final int DELETE = 0;
     public static final int MOVE   = 1;
     public static final int NONE   = 2;
+    private static final long FILE_SIZE_CHECK_INTERVAL_DEFAULT = 1000L;
 
     /** File or Directory to scan */
     private String fileURI;
@@ -215,7 +216,7 @@ public class VFSConfig {
         this.checkSizeInterval = Optional.ofNullable(properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_INTERVAL))
                 .filter(s -> !s.isEmpty())
                 .map(Long::parseLong)
-                .orElse(0L);
+                .orElse(FILE_SIZE_CHECK_INTERVAL_DEFAULT);
         this.checkSizeIgnoreEmpty = Boolean.parseBoolean(properties.getProperty(VFSConstants.TRANSPORT_CHECK_SIZE_IGNORE_EMPTY, "false"));
 
         // Retry / reconnect

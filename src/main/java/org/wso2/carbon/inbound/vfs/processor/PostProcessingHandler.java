@@ -35,7 +35,6 @@ public class PostProcessingHandler implements PostProcessor {
     public void onSuccess(FileObject fileObject) throws Exception {
 
         if (onSuccessAction !=null) {
-            log.info("Running on success action");
             onSuccessAction.execute(fileObject);
         }
     }
@@ -43,7 +42,6 @@ public class PostProcessingHandler implements PostProcessor {
     @Override
     public void onFail(FileObject fileObject) throws Exception {
         if (onFailAction!=null) {
-            log.info("Running on fail action");
             onFailAction.execute(fileObject);
         }
     }

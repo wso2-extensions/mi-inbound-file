@@ -23,7 +23,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.WordUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.synapse.commons.vfs.VFSConstants;
 import org.wso2.carbon.inbound.vfs.processor.Action;
 import org.wso2.carbon.inbound.vfs.processor.DeleteAction;
 import org.wso2.carbon.inbound.vfs.processor.MoveAction;
@@ -31,7 +30,6 @@ import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.FileSystemException;
 import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
-import org.wso2.org.apache.commons.vfs2.impl.DefaultFileSystemManager;
 import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsDataChannelProtectionLevel;
 import org.wso2.org.apache.commons.vfs2.provider.ftps.FtpsFileSystemConfigBuilder;
@@ -576,36 +574,7 @@ public class Utils {
         return uri;
     }
 
-    /**
-     * Release a file item lock acquired either by the VFS listener or a sender
-     *
-     * @param fsManager which is used to resolve the processed file
-     * @param fo        representing the processed file
-     * @param fso       represents file system options used when resolving file from file system manager.
-     */
-    public static void releaseLock(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
-        String fullPath = fo.getName().getURI();
-        FileObject lockObject;
 
-        try {
-            int pos = fullPath.indexOf('?');
-            if (pos > -1) {
-                fullPath = fullPath.substring(0, pos);
-            }
-            lockObject = fsManager.resolveFile(fullPath + LOCK_FILE_SUFFIX, fso);
-            if (lockObject.exists()) {
-                lockObject.delete();
-            }
-        } catch (FileSystemException e) {
-            log.error("Couldn't release the lock for the file : "
-                    + maskURLPassword(fo.getName().getURI()) + " after processing");
-            try {
-                ((DefaultFileSystemManager) fsManager).closeCachedFileSystem(fullPath + LOCK_FILE_SUFFIX, fso);
-            } catch (Exception e1) {
-                log.warn("Unable to clear file system", e1);
-            }
-        }
-    }
 
     public static String stripVfsSchemeIfPresent(String uri) {
         return uri != null && uri.startsWith("vfs:") ? uri.substring(4) : uri;

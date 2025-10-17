@@ -87,10 +87,6 @@ public class FileInjectHandler {
             msgCtx.setProperty(SynapseConstants.INBOUND_ENDPOINT_NAME, name);
             msgCtx.setProperty(SynapseConstants.ARTIFACT_NAME, SynapseConstants.FAIL_SAFE_MODE_INBOUND_ENDPOINT + name);
             msgCtx.setProperty(SynapseConstants.IS_INBOUND, true);
-            if (vfsProperties.getReplyFileURI() != null && !vfsProperties.getReplyFileURI().isEmpty()) {
-                msgCtx.setProperty(Constants.OUT_TRANSPORT_INFO,
-                        new VFSOutTransportInfo(vfsProperties.getReplyFileURI(), vfsProperties.isFileLocking()));
-            }
 
             InboundEndpoint inboundEndpoint = msgCtx.getConfiguration().getInboundEndpoint(name);
             CustomLogSetter.getInstance().setLogAppender(inboundEndpoint.getArtifactContainerName());

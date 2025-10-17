@@ -34,6 +34,7 @@ import org.wso2.org.apache.commons.vfs2.FileSystemException;
 import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
 import org.wso2.org.apache.commons.vfs2.FileType;
+import org.wso2.org.apache.commons.vfs2.cache.NullFilesCache;
 import org.wso2.org.apache.commons.vfs2.impl.StandardFileSystemManager;
 import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 
@@ -56,7 +57,7 @@ public class VFSConsumer extends GenericPollingConsumer {
     private static final Log log = LogFactory.getLog(VFSConsumer.class);
     private static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
     private final VFSConfig vfsConfig;
-    private final FileSystemManager fsManager;
+    private FileSystemManager fsManager = null;
     private final FileSelector fileSelector;
     private final PreProcessingHandler preProcessingHandler;
     private final PostProcessingHandler postProcessingHandler;
@@ -91,10 +92,12 @@ public class VFSConsumer extends GenericPollingConsumer {
         try {
             StandardFileSystemManager mgr = new StandardFileSystemManager();
             mgr.setClassLoader(getClass().getClassLoader());
+            // we don't need to cache files in the consumer side
+            mgr.setFilesCache(new NullFilesCache());
             mgr.init();
             this.fsManager = mgr;
         } catch (FileSystemException e) {
-            throw new RuntimeException("Error initializing VFS FileSystemManager", e);
+            VFSTransportErrorHandler.handleException(log, "Error initializing VFS FileSystemManager", e);
         }
 
         // Build FSO once per poll (protocol options; auth; SFTP opts; etc.)
@@ -121,8 +124,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Resolve input URI and subdirectory setting from config (supports /* or \*)
         ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
         if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
-            log.error("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
-            throw new RuntimeException("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+            VFSTransportErrorHandler.handleException(log, "Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
         }
         readSubDirectories = inFileUri.supportSubDirectories;
         fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
@@ -155,10 +157,12 @@ public class VFSConsumer extends GenericPollingConsumer {
         try {
             StandardFileSystemManager mgr = new StandardFileSystemManager();
             mgr.setClassLoader(getClass().getClassLoader());
+            // we don't need to cache files in the consumer side
+            mgr.setFilesCache(new NullFilesCache());
             mgr.init();
             this.fsManager = mgr;
         } catch (FileSystemException e) {
-            throw new RuntimeException("Error initializing VFS FileSystemManager", e);
+           VFSTransportErrorHandler.handleException(log, "Error initializing VFS FileSystemManager", e);
         }
 
         this.fso = null;
@@ -185,8 +189,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         // Resolve input URI and subdirectory setting from config (supports /* or \*)
         ResolvedFileUri inFileUri = extractFileUri(VFSConstants.TRANSPORT_FILE_FILE_URI);
         if (inFileUri == null || StringUtils.isBlank(inFileUri.resolvedUri)) {
-            log.error("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
-            throw new RuntimeException("Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
+            VFSTransportErrorHandler.handleException(log, "Invalid FileURI. Check configuration. URI: " + maskURLPassword(vfsConfig.getFileURI()));
         }
         readSubDirectories = inFileUri.supportSubDirectories;
         fileURI = stripVfsSchemeIfPresent(inFileUri.resolvedUri);
@@ -250,6 +253,7 @@ public class VFSConsumer extends GenericPollingConsumer {
                 // Directory mode (optional recursion)
                 processDirectory(root);
             } else {
+                // TODO: to handle FileType FILE_OR_FOLDER;
                 if (log.isDebugEnabled()) {
                     log.debug("Ignoring non-file, non-folder: " + maskURLPassword(root.toString()));
                 }
@@ -363,13 +367,6 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (isClosed) {
             return;
         }
-        // Check if file is still uploading (size checking with MD5)
-        if (isFileStillUploading(file)) {
-            if (log.isDebugEnabled()) {
-                log.debug("File still uploading, skipping: " + maskURLPassword(file.toString()));
-            }
-            return;
-        }
         file.setIsMounted(vfsConfig.isFileLocking());
         // Delegate readiness, age, size, pattern, etc. to FileSelector
         if (!fileSelector.isValidFile(file)) {
@@ -428,9 +425,15 @@ public class VFSConsumer extends GenericPollingConsumer {
 
                 boolean ok = fileInjectHandler.invoke(file, name);
                 if (ok) {
+                    if (log.isDebugEnabled()) {
+                        log.debug("File processed successfully: " + maskURLPassword(file.toString()));
+                    }
                     postProcessingHandler.onSuccess(file);
                 } else {
                     // handle the failed records here too
+                    if (log.isDebugEnabled()) {
+                        log.debug("File processing failed: " + maskURLPassword(file.toString()));
+                    }
                     postProcessingHandler.onFail(file);
                 }
             }
@@ -448,7 +451,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         } finally {
             // Release lock if file locking is enabled and we shouldn't skip
             if (fileLock) {
-                Utils.releaseLock(fsManager, file, fso);
+                lockManager.releaseLock(file);
                 if (log.isDebugEnabled()) {
                     log.debug("Released the lock for file: " + maskURLPassword(file.toString()));
                 }
@@ -482,57 +485,10 @@ public class VFSConsumer extends GenericPollingConsumer {
         MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig, fsManager);
         try {
             moveAction.execute(file);
+            //TODO: remove failed record from the list file.
         } catch (FileSystemException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * Check if file is still uploading using MD5 checksum
-     */
-    private boolean isFileStillUploading(FileObject file) {
-        try {
-            String md5Before = getMD5Checksum(file);
-
-            // Check if file is empty
-            if (EMPTY_MD5.equals(md5Before)) {
-                return false;
-            }
-
-            // Wait and check again
-            Thread.sleep(1000);
-            file.refresh();
-            String md5After = getMD5Checksum(file);
-
-            return !md5Before.equals(md5After);
-
-        } catch (Exception e) {
-            if (log.isDebugEnabled()) {
-                log.debug("Error checking if file is uploading: " + maskURLPassword(file.toString()), e);
-            }
-            return true;
-        }
-    }
-
-    /**
-     * Calculate MD5 checksum of file
-     */
-    private String getMD5Checksum(FileObject file) throws Exception {
-        try (InputStream is = file.getContent().getInputStream()) {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] buffer = new byte[8192];
-            int bytesRead;
-
-            while ((bytesRead = is.read(buffer)) != -1) {
-                md.update(buffer, 0, bytesRead);
-            }
-
-            byte[] digest = md.digest();
-            StringBuilder sb = new StringBuilder();
-            for (byte b : digest) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
+            VFSTransportErrorHandler.handleException(log, "Error moving file during failed record removal: " +
+                    maskURLPassword(file.toString()), e);
         }
     }
 
@@ -677,7 +633,6 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     public void destroy() {
-//        fsManager.close();
         this.close();
     }
 
@@ -712,7 +667,6 @@ public class VFSConsumer extends GenericPollingConsumer {
                 if (file.exists()) {
                     // Remove from failed records and retry processing
                     removeFromFailedRecords(file);
-                    processFile(file);
                 } else {
                     if (log.isDebugEnabled()) {
                         log.debug("Failed record file no longer exists: " + maskURLPassword(file.toString()));

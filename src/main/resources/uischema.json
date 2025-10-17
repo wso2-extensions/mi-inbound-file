@@ -161,8 +161,8 @@
           {
             "type": "attribute",
             "value": {
-              "name": "processingConfigType",
-              "displayName": "File Processing Configuration",
+              "name": "fileThrottlingType",
+              "displayName": "File Throttling Type",
               "inputType": "combo",
               "defaultValue": "Count",
               "required": "true",
@@ -184,7 +184,7 @@
               "helpTip": "Maximum number of files to process in a single polling cycle.",
               "enableCondition": [
                 {
-                  "processingConfigType": "Count"
+                  "fileThrottlingType": "Count"
                 }
               ]
             }
@@ -200,21 +200,9 @@
               "helpTip": "Delay (in milliseconds) between processing consecutive files.",
               "enableCondition": [
                 {
-                  "processingConfigType": "Interval"
+                  "fileThrottlingType": "Interval"
                 }
               ]
-            }
-          }
-        ,
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.ReplyFileURI",
-              "displayName": "Reply File URI",
-              "inputType": "string",
-              "defaultValue": "",
-              "hidden": "true",
-              "required": "false"
             }
           },
           {

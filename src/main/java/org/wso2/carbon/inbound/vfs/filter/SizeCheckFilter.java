@@ -37,6 +37,7 @@ public class SizeCheckFilter implements Filter {
     VFSConfig vfsConfig;
     FileSystemManager fsManager;
     public static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
+    public static final String MD5 = "MD5";
     public SizeCheckFilter(VFSConfig vfsConfig, FileSystemManager fsManager) {
         this.vfsConfig = vfsConfig;
         this.fsManager = fsManager;
@@ -65,19 +66,12 @@ public class SizeCheckFilter implements Filter {
             String md5 = getMD5Checksum(inputStream);
             return isFileEmpty(md5) || isFileStillChangingSize(child, md5);
         } catch (Exception e) {
-            try {
-                if (ExceptionUtils.getStackTrace(e).contains("The file is being used by another process")) {
-                    return true;
-                }
-            } catch (Exception e2) {
-            }
-            //return true when any exception occurs
             return true;
         } finally {
             if(inputStream != null){
                 try {
                     inputStream.close();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
             }
         }
@@ -92,11 +86,6 @@ public class SizeCheckFilter implements Filter {
      * @return if file is empty or the filesize is changing
      */
     private boolean isFileStillChangingSize(FileObject child, String md5) {
-        //check if the lock mechanism is activated
-        if (vfsConfig.getCheckSizeInterval() > 0) {
-            //not checking the file size changing
-            return false;
-        }
         try {
             //get interval time
             long checkSizeInterval = vfsConfig.getCheckSizeInterval();
@@ -104,10 +93,6 @@ public class SizeCheckFilter implements Filter {
             //wait interval time
             log.debug("Check if file is still uploading. Now sleep "+checkSizeInterval+" ms");
             Thread.sleep(checkSizeInterval);
-            //get second MD5
-            //clear cache and refresh
-            fsManager.getFilesCache().close();
-            child.refresh();
             String md5AfterSleep = getMD5Checksum(child);
             if (!md5.equals(md5AfterSleep)) {
                 //file is still uploading
@@ -115,12 +100,6 @@ public class SizeCheckFilter implements Filter {
                 return true;
             }
         } catch (Exception e) {
-            try {
-                if (ExceptionUtils.getStackTrace(e).contains("The file is being used by another process")) {
-                    return true;
-                }
-            } catch (Exception ignored) {
-            }
             return true;
         }
         return false;
@@ -131,7 +110,9 @@ public class SizeCheckFilter implements Filter {
             //get first MD5
             return getMD5Checksum(inputStream);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.error("Error while calculating MD5 checksum for file: " +
+                    Utils.maskURLPassword(child.getName().toString()), e);
+            return null;
         }
     }
 
@@ -160,7 +141,7 @@ public class SizeCheckFilter implements Filter {
      */
     private byte[] createChecksum(InputStream fis) throws Exception {
         byte[] buffer = new byte[1024];
-        MessageDigest complete = MessageDigest.getInstance("MD5");
+        MessageDigest complete = MessageDigest.getInstance(MD5);
         int numRead;
         do {
             numRead = fis.read(buffer);
@@ -168,7 +149,6 @@ public class SizeCheckFilter implements Filter {
                 complete.update(buffer, 0, numRead);
             }
         } while (numRead != -1);
-        fis.close();
         return complete.digest();
     }
 

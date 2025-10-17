@@ -20,6 +20,7 @@ package org.wso2.carbon.inbound.vfs;
 
 import org.apache.axis2.AxisFault;
 import org.apache.commons.logging.Log;
+import org.apache.synapse.SynapseException;
 
 public class VFSTransportErrorHandler {
 
@@ -108,9 +109,9 @@ public class VFSTransportErrorHandler {
      * @param e Exception
      * @throws AxisFault
      */
-    public static void handleException(Log log, String message, Exception e) throws AxisFault {
+    public static void handleException(Log log, String message, Exception e) throws SynapseException {
         logException(log, LogType.ERROR, message, e);
-        throw new AxisFault(message, e);
+        throw new SynapseException(message, e);
     }
 
     /**
@@ -121,9 +122,9 @@ public class VFSTransportErrorHandler {
      * @param e Exception
      * @throws AxisFault
      */
-    public static void handleException(Log log, String message, String configName, Exception e) throws AxisFault {
+    public static void handleException(Log log, String message, String configName, Exception e) throws SynapseException {
         logException(log, LogType.ERROR, message, configName, e);
-        throw new AxisFault(message, e);
+        throw new SynapseException(message, e);
     }
 
     /**
@@ -132,9 +133,9 @@ public class VFSTransportErrorHandler {
      * @param message String message to be logged
      * @throws AxisFault
      */
-    public static void handleException(Log log, String message) throws AxisFault {
+    public static void handleException(Log log, String message) throws SynapseException {
         logException(log, LogType.ERROR, message);
-        throw new AxisFault(message);
+        throw new SynapseException(message);
     }
 
     /**
@@ -144,9 +145,9 @@ public class VFSTransportErrorHandler {
      * @param configName String name of the configuration
      * @throws AxisFault
      */
-    public static void handleException(Log log, String message, String configName) throws AxisFault {
+    public static void handleException(Log log, String message, String configName) throws SynapseException {
         logException(log, LogType.ERROR, message, configName);
-        throw new AxisFault(message);
+        throw new SynapseException(message);
     }
 
     /**

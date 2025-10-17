@@ -38,7 +38,7 @@ public class FileSelector {
         if (StringUtils.isNotEmpty(config.getFileNamePattern())) {
             filters.add(new FileNameFilter(config));
         }
-        if (config.getFileSizeLimit() >= 0) {
+        if (config.getFileSizeLimit() > 0) {
             filters.add(new SizeFilter(config));
         }
         if (config.getCheckSizeInterval() > 0) {

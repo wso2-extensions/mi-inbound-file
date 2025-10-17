@@ -20,7 +20,6 @@ package org.wso2.carbon.inbound.vfs.lock;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.synapse.commons.vfs.VFSParamDTO;
 import org.wso2.carbon.inbound.vfs.Utils;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
 import org.wso2.org.apache.commons.vfs2.FileObject;
@@ -88,15 +87,7 @@ public class LockManager {
             return false;
         }
 
-        // Create VFSParamDTO with lock parameters
-        VFSParamDTO vfsParamDTO = new VFSParamDTO();
-        if (autoLockRelease) {
-            vfsParamDTO.setAutoLockRelease(autoLockRelease);
-            vfsParamDTO.setAutoLockReleaseSameNode(autoLockReleaseSameNode);
-            vfsParamDTO.setAutoLockReleaseInterval(autoLockReleaseInterval);
-        }
-
-        return acquireLock(fsManager, fileObject, vfsParamDTO, fso, true);
+        return acquireLock(fsManager, fileObject,  fso, true);
     }
 
 
@@ -113,7 +104,7 @@ public class LockManager {
      *            represents file system options used when resolving file from file system manager.
      * @return boolean true if the lock has been acquired or false if not
      */
-    public static synchronized boolean acquireLock(FileSystemManager fsManager, FileObject fo, VFSParamDTO paramDTO,
+    public  synchronized boolean acquireLock(FileSystemManager fsManager, FileObject fo,
                                                    FileSystemOptions fso, boolean isListener) {
         String strLockValue = getLockValue();
         byte[] lockValue = strLockValue.getBytes();
@@ -130,9 +121,9 @@ public class LockManager {
                         + maskURLPassword(fo.getName().getURI())
                         + ". This could possibly be due to some other party already "
                         + "processing this file or the file is still being uploaded");
-                if(paramDTO != null && paramDTO.isAutoLockRelease()){
-                    releaseLock(lockValue, strLockValue, lockObject, paramDTO.isAutoLockReleaseSameNode(),
-                            paramDTO.getAutoLockReleaseInterval());
+                if(autoLockRelease){
+                    releaseLock(lockValue, strLockValue, lockObject, autoLockReleaseSameNode,
+                            autoLockReleaseInterval);
                 }
             } else {
                 if (isListener) {
@@ -182,7 +173,7 @@ public class LockManager {
      * Lock format random:hostname:hostip:time
      * @return lock value as a string
      */
-    private static String getLockValue() {
+    private String getLockValue() {
 
         StringBuilder lockValueBuilder = new StringBuilder();
         lockValueBuilder.append(randomNumberGenerator.nextLong());
@@ -200,7 +191,7 @@ public class LockManager {
         return lockValueBuilder.toString();
     }
 
-    private static void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject,
+    private void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject,
                                     Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {
         try {
             InputStream is = lockObject.getContent().getInputStream();
@@ -210,10 +201,9 @@ public class LockManager {
             is.close();
             String strVal = new String(val);
             // Lock format random:hostname:hostip:time
-            String[] arrVal = strVal.split(":");
+            String[] arrVal = strVal.split(STR_SPLITER);
             String[] arrValNew = sLockValue.split(STR_SPLITER);
-            if (arrVal.length == 4 && arrValNew.length == 4
-                    && (!autoLockReleaseSameNode || (arrVal[1].equals(arrValNew[1]) && arrVal[2].equals(arrValNew[2])))) {
+            if (canReleaseLock(arrVal, arrValNew)) {
                 long lInterval = 0;
                 try {
                     lInterval = Long.parseLong(arrValNew[3]) - Long.parseLong(arrVal[3]);
@@ -225,12 +215,12 @@ public class LockManager {
                 lockObject.close();
             }
         } catch (IOException e) {
-            log.error("Couldn't verify the lock", e);
+            log.error("Couldn't release the lock for auto-release of lock file");
         }
     }
 
 
-    private static boolean createLockFile(byte[] lockValue, FileObject lockObject, String fullPath)
+    private boolean createLockFile(byte[] lockValue, FileObject lockObject, String fullPath)
             throws FileSystemException {
         // write a lock file before starting of the processing, to ensure that the
         // item is not processed by any other parties
@@ -255,7 +245,7 @@ public class LockManager {
         return true;
     }
 
-    private static void deleteLockFile(FileObject lockObject, Long autoLockReleaseInterval, long lInterval)
+    private  void deleteLockFile(FileObject lockObject, Long autoLockReleaseInterval, long lInterval)
             throws FileSystemException {
         if (autoLockReleaseInterval == null || autoLockReleaseInterval <= lInterval) {
             try {
@@ -269,7 +259,7 @@ public class LockManager {
     }
 
 
-    private static boolean verifyLock(byte[] lockValue, FileObject lockObject) {
+    private  boolean verifyLock(byte[] lockValue, FileObject lockObject) {
         try {
             InputStream is = lockObject.getContent().getInputStream();
             byte[] val = new byte[lockValue.length];
@@ -301,4 +291,40 @@ public class LockManager {
         }
         this.autoLockReleaseSameNode = vfsConfig.getAutoLockReleaseSameNode();
     }
+
+    private boolean canReleaseLock(String[] oldLock, String[] newLock) {
+        if (!autoLockReleaseSameNode) { return true;}
+
+        return oldLock.length ==4 && newLock.length ==4 && oldLock[1].equals(newLock[1]) && oldLock[2].equals(newLock[2]);
+    }
+
+    /**
+     * Release a file item lock acquired either by the VFS listener or a sender
+     *
+     * @param fo        representing the processed file
+     */
+    public void releaseLock(FileObject fo) {
+        String fullPath = fo.getName().getURI();
+        FileObject lockObject;
+
+        try {
+            int pos = fullPath.indexOf('?');
+            if (pos > -1) {
+                fullPath = fullPath.substring(0, pos);
+            }
+            lockObject = fsManager.resolveFile(fullPath + LOCK_FILE_SUFFIX, fso);
+            if (lockObject.exists()) {
+                lockObject.delete();
+            }
+        } catch (FileSystemException e) {
+            log.error("Couldn't release the lock for the file : "
+                    + maskURLPassword(fo.getName().getURI()) + " after processing");
+            try {
+                ((DefaultFileSystemManager) fsManager).closeCachedFileSystem(fullPath + LOCK_FILE_SUFFIX, fso);
+            } catch (Exception e1) {
+                log.warn("Unable to clear file system", e1);
+            }
+        }
+    }
+
 }
