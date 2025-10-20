@@ -438,9 +438,13 @@ public class VFSConsumer extends GenericPollingConsumer {
         } catch (Exception e) {
             log.error("Error processing file: " + maskURLPassword(file.toString()), e);
             try {
-                String timeStamp =
-                        Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
-                Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
+                if (vfsConfig.getMoveAfterMoveFailure() != null) {
+                    String timeStamp =
+                            Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
+                    Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
+                } else {
+                    Utils.markFailRecord(fsManager, file, fso);
+                }
             } catch (Exception failHandlingError) {
                 log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
                 // Mark as failed record if we couldn't handle the failure
@@ -476,13 +480,14 @@ public class VFSConsumer extends GenericPollingConsumer {
      */
     private void removeFromFailedRecords(FileObject file) {
         // Implementation to remove from failed records tracking
-        // This would depend on your failed record storage mechanism
         if (log.isDebugEnabled()) {
             log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
         }
-        MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterProcess(), vfsConfig, fsManager);
         try {
-            moveAction.execute(file);
+            if (vfsConfig.getMoveAfterMoveFailure() != null) {
+                MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterMoveFailure(), vfsConfig, fsManager);
+                moveAction.execute(file);
+            }
             //TODO: remove failed record from the list file.
         } catch (FileSystemException e) {
             VFSTransportErrorHandler.handleException(log, "Error moving file during failed record removal: " +
@@ -613,6 +618,7 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     public void close() {
         isClosed = true;
+        fsManager.close();
         if (retryScheduler != null && !retryScheduler.isShutdown()) {
             retryScheduler.shutdown();
             try {
@@ -648,8 +654,7 @@ public class VFSConsumer extends GenericPollingConsumer {
     @Override
     public void pause() {
         isClosed = true;
-        fsManager.close();
-        retryScheduler.shutdown();
+        this.close();
     }
 
     private static class ResolvedFileUri {
