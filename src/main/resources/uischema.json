@@ -188,7 +188,7 @@
               "displayName": "File Process Count",
               "inputType": "string",
               "defaultValue": "",
-              "required": "false",
+              "required": "true",
               "helpTip": "Maximum number of files to process in a single polling cycle.",
               "enableCondition": [
                 {
@@ -204,7 +204,7 @@
               "displayName": "File Process Interval (ms)",
               "inputType": "string",
               "defaultValue": "0",
-              "required": "false",
+              "required": "true",
               "helpTip": "Delay (in milliseconds) between processing consecutive files.",
               "enableCondition": [
                 {
@@ -240,7 +240,7 @@
       "type": "attributeGroup",
       "value": {
         "groupName": "Actions",
-        "isCollapsed": true,
+        "isCollapsed": false,
         "elements": [
           {
             "type": "attribute",
@@ -252,7 +252,7 @@
                 "DELETE",
                 "MOVE"
               ],
-              "defaultValue": "DELETE",
+              "defaultValue": "MOVE",
               "required": "false"
             }
           },
@@ -263,7 +263,8 @@
               "displayName": "Move After Process",
               "inputType": "string",
               "defaultValue": "",
-              "required": "false",
+              "required": "true",
+              "helpTip": "URI for the target location.",
               "enableCondition": [
                 {
                   "transport.vfs.ActionAfterProcess": "MOVE"
@@ -296,7 +297,7 @@
                 "DELETE",
                 "MOVE"
               ],
-              "defaultValue": "DELETE",
+              "defaultValue": "MOVE",
               "required": "false"
             }
           },
@@ -305,6 +306,22 @@
             "value": {
               "name": "transport.vfs.MoveAfterFailure",
               "displayName": "Move After Failure",
+              "inputType": "string",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "URI for the target location for failed files.",
+              "enableCondition": [
+                {
+                  "transport.vfs.ActionAfterFailure": "MOVE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterFailedMove",
+              "displayName": "Secondary Fallback Destination",
               "inputType": "string",
               "defaultValue": "",
               "required": "false",
@@ -333,21 +350,6 @@
               "inputType": "string",
               "defaultValue": "",
               "required": "false"
-            }
-          },
-          {
-            "type": "attribute",
-            "value": {
-              "name": "transport.vfs.MoveAfterFailedMove",
-              "displayName": "Secondary Fallback Destination",
-              "inputType": "string",
-              "defaultValue": "",
-              "required": "false",
-              "enableCondition": [
-                {
-                  "transport.vfs.ActionAfterFailure": "MOVE"
-                }
-              ]
             }
           },
           {

@@ -57,7 +57,9 @@ public class MoveAction implements Action {
         // after success
         FileSystemOptions destinationFSO = null;
         Map<String, String> query = Utils.parseSchemeFileOptions(targetLocation, new Properties());
-        query.putAll(vfsConfig.getVfsSchemeProperties());
+        if (query != null) {
+            query.putAll(vfsConfig.getVfsSchemeProperties());
+        }
         targetLocation = Utils.stripVfsSchemeIfPresent(targetLocation);
         targetLocation = extractPath(targetLocation);
 
@@ -80,7 +82,7 @@ public class MoveAction implements Action {
 
             FileObject moveToDirectory = fsManager.resolveFile(targetLocation, destinationFSO);
             FileObject dest = moveToDirectory.resolveFile(fileObject.getName().getBaseName());
-            if (!StringUtils.isEmpty(query.get(org.wso2.carbon.inbound.vfs.VFSConstants.FORCE_CREATE_FOLDER))) {
+            if (query != null && !StringUtils.isEmpty(query.get(org.wso2.carbon.inbound.vfs.VFSConstants.FORCE_CREATE_FOLDER))) {
                 String isForceCreated = query.get(VFSConstants.FORCE_CREATE_FOLDER);
                 if (Boolean.parseBoolean(isForceCreated)) {
                     dest.createFile();
