@@ -74,7 +74,7 @@ public class FileInjectHandler {
     /**
      * Inject the message to the sequence
      */
-    public boolean invoke(Object object, String name) throws SynapseException {
+    public boolean invoke(Object object, String name) {
 
         ManagedDataSource dataSource = null;
 
@@ -190,11 +190,9 @@ public class FileInjectHandler {
             } else {
                 log.error("Sequence: " + injectingSeq + " not found");
             }
-        } catch (SynapseException se) {
-            throw se;
         } catch (Exception e) {
             log.error("Error while processing the file/folder", e);
-            throw new SynapseException("Error while processing the file/folder", e);
+            return false;
         } finally {
             if (dataSource != null) {
                 dataSource.destroy();
