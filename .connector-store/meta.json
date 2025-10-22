@@ -17,7 +17,7 @@
     ],
     "releases": [
         {
-            "tagName": "v0.9.2",
+            "tagName": "v0.9.3",
             "products": [
                 "MI 4.5.0"
             ],
@@ -120,14 +120,14 @@
                         {
                             "name": "transport.vfs.FileProcessCount",
                             "type": "string",
-                            "required": false,
+                            "required": true,
                             "defaultValue": "",
                             "description": "Maximum number of files to process in a single polling cycle."
                         },
                         {
                             "name": "transport.vfs.FileProcessInterval",
                             "type": "string",
-                            "required": false,
+                            "required": true,
                             "defaultValue": "0",
                             "description": "Delay (in milliseconds) between processing consecutive files."
                         },
@@ -149,15 +149,15 @@
                             "name": "transport.vfs.ActionAfterProcess",
                             "type": "combo",
                             "required": false,
-                            "defaultValue": "DELETE",
+                            "defaultValue": "MOVE",
                             "description": ""
                         },
                         {
                             "name": "transport.vfs.MoveAfterProcess",
                             "type": "string",
-                            "required": false,
+                            "required": true,
                             "defaultValue": "",
-                            "description": ""
+                            "description": "URI for the target location."
                         },
                         {
                             "name": "transport.vfs.MoveTimestampFormat",
@@ -170,11 +170,18 @@
                             "name": "transport.vfs.ActionAfterFailure",
                             "type": "combo",
                             "required": false,
-                            "defaultValue": "DELETE",
+                            "defaultValue": "MOVE",
                             "description": ""
                         },
                         {
                             "name": "transport.vfs.MoveAfterFailure",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "URI for the target location for failed files."
+                        },
+                        {
+                            "name": "transport.vfs.MoveAfterFailedMove",
                             "type": "string",
                             "required": false,
                             "defaultValue": "",
@@ -189,13 +196,6 @@
                         },
                         {
                             "name": "transport.vfs.FailedRecordsFileDestination",
-                            "type": "string",
-                            "required": false,
-                            "defaultValue": "",
-                            "description": ""
-                        },
-                        {
-                            "name": "transport.vfs.MoveAfterFailedMove",
                             "type": "string",
                             "required": false,
                             "defaultValue": "",
