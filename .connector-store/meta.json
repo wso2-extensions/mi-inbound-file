@@ -7,7 +7,7 @@
     "rank": 15,
     "type": "Inbound",
     "category": "Developer Tools",
-    "documentationUrl": "",
+    "documentationUrl": "https://mi.docs.wso2.com/en/latest/reference/connectors/file-inbound/file-inbound-overview/",
     "description": "File Event Listener",
     "status": "Active",
     "labels": [
