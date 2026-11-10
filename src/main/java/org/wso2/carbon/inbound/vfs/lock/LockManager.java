@@ -193,11 +193,11 @@ public class LockManager {
     private void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject,
                              Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {
         try {
-            InputStream is = lockObject.getContent().getInputStream();
             byte[] val = new byte[bLockValue.length];
-            // noinspection ResultOfMethodCallIgnored
-            is.read(val);
-            is.close();
+            try (InputStream is = lockObject.getContent().getInputStream()) {
+                // noinspection ResultOfMethodCallIgnored
+                is.read(val);
+            }
             String strVal = new String(val);
             // Lock format random:hostname:hostip:time
             String[] arrVal = strVal.split(STR_SPLITER);
