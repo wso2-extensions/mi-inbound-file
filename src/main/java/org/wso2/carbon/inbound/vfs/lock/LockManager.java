@@ -259,8 +259,7 @@ public class LockManager {
 
 
     private boolean verifyLock(byte[] lockValue, FileObject lockObject) {
-        try {
-            InputStream is = lockObject.getContent().getInputStream();
+        try (InputStream is = lockObject.getContent().getInputStream()) {
             byte[] val = new byte[lockValue.length];
             // noinspection ResultOfMethodCallIgnored
             is.read(val);
