@@ -28,6 +28,7 @@ import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.FileSystemException;
 import org.wso2.org.apache.commons.vfs2.FileSystemManager;
 import org.wso2.org.apache.commons.vfs2.FileSystemOptions;
+import org.wso2.org.apache.commons.vfs2.provider.UriParser;
 
 import java.text.DateFormat;
 import java.util.Map;
@@ -45,11 +46,27 @@ public class MoveAction implements Action {
     String targetLocation;
     VFSConfig vfsConfig;
     FileSystemManager fsManager;
+    // Read once here: execute() strips the query from targetLocation.
+    private final boolean isDestinationMounted;
 
     public MoveAction(String targetLocation, VFSConfig vfsConfig, FileSystemManager fsManager) {
         this.targetLocation = targetLocation;
         this.vfsConfig = vfsConfig;
         this.fsManager = fsManager;
+        this.isDestinationMounted = isMounted(targetLocation);
+    }
+
+    /**
+     * Returns whether the given URI is marked as volume mounted with the transport.vfs.IsMounted query parameter.
+     */
+    private boolean isMounted(String uri) {
+        try {
+            return Boolean.parseBoolean(UriParser.extractQueryParams(uri).get(VFSConstants.IS_MOUNTED));
+        } catch (FileSystemException e) {
+            log.warn("Unable to read " + VFSConstants.IS_MOUNTED + " from the move location "
+                    + Utils.maskURLPassword(uri), e);
+            return false;
+        }
     }
 
     @Override
@@ -96,6 +113,7 @@ public class MoveAction implements Action {
                 dest = fileObject.resolveFile(moveTimestampFormat + "_" + fileObject.getName().getBaseName());
             }
 
+            dest.setIsMounted(isDestinationMounted);
             fileObject.moveTo(dest);
             log.info("File moved");
 

@@ -365,7 +365,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (isClosed) {
             return;
         }
-        file.setIsMounted(vfsConfig.isFileLocking());
+        file.setIsMounted(isMounted);
         // Delegate readiness, age, size, pattern, etc. to FileSelector
         if (!fileSelector.isValidFile(file)) {
             if (log.isDebugEnabled()) {
