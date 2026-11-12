@@ -260,6 +260,11 @@ public class VFSConstants {
     public static final String DISK_SHARE_ACCESS_MASK = "vfs.diskShareAccessMask";
     public static final String DISK_SHARE_ACCESS_MASK_MAX_ALLOWED = "MAXIMUM_ALLOWED";
     public static final String FAIL_FILE_SUFFIX = ".fail";
+    // Post-processing action recorded in a .fail marker, so that only that action is retried later
+    public static final String FAILED_ACTION_SUCCESS = "SUCCESS";
+    public static final String FAILED_ACTION_FAILURE = "FAILURE";
+    // a marker written by an earlier version: the failed action is unknown, so it is never retried
+    public static final String FAILED_ACTION_UNKNOWN = "UNKNOWN";
     public static final String STR_SPLITER = ":";
     public static final String LOCK_FILE_SUFFIX = ".lock";
     // sftp scheme file option list

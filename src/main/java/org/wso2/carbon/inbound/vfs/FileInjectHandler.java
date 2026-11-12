@@ -191,6 +191,12 @@ public class FileInjectHandler {
                 log.error("Sequence: " + injectingSeq + " not found");
             }
         } catch (Exception e) {
+            if (FileNotAvailableException.isFileNotFound(e)) {
+                // As in Synapse: the file is gone (e.g. moved by another process), so the caller skips the
+                // post-processing action instead of treating it as a failed file
+                throw new FileNotAvailableException("File is no longer available: "
+                        + Utils.maskURLPassword(String.valueOf(object)), e);
+            }
             log.error("Error while processing the file/folder", e);
             return false;
         } finally {
