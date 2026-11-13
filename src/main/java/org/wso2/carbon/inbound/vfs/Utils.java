@@ -341,7 +341,7 @@ public class Utils {
             } else {
                 List<String> content = FileUtils.readLines(failedRecordFile);
                 for (String line : content) {
-                    if (isRecordOf(line, key, null)) {
+                    if (isRecordOf(line, key)) {
                         return true;     // already recorded
                     }
                 }
@@ -365,12 +365,10 @@ public class Utils {
 
     /**
      * Whether a failed records line belongs to the given key. Lines written by earlier versions start with the
-     * base name only; they are matched by {@code legacyBaseName} when it is given.
+     * base name only; they are not matched, so they cannot affect other files with the same name.
      */
-    private static boolean isRecordOf(String line, String key, String legacyBaseName) {
-        String delimiter = VFSConstants.FAILED_RECORD_DELIMITER;
-        return line.startsWith(key + delimiter)
-                || (legacyBaseName != null && line.startsWith(legacyBaseName + delimiter));
+    private static boolean isRecordOf(String line, String key) {
+        return line.startsWith(key + VFSConstants.FAILED_RECORD_DELIMITER);
     }
 
     public static String getSystemTime(String dateFormat) {
@@ -383,8 +381,8 @@ public class Utils {
      * later poll can retry only that action and can tell whether the file was replaced by a new one.
      * Only the existence of the marker is checked to skip the file.
      */
-    public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso,
-                                                   String failedAction) {
+    public static void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso,
+                                      String failedAction) {
 
         String failText = Long.toString((new Date()).getTime());
         if (failedAction != null) {
@@ -524,8 +522,7 @@ public class Utils {
     /**
      * Deletes the {@code <file>.fail} marker of the given file, if it exists.
      */
-    public static synchronized void releaseFailRecord(FileSystemManager fsManager, FileObject fo,
-                                                      FileSystemOptions fso) {
+    public static void releaseFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
         String fullPath = getFullPath(fo);
         try {
             FileObject failObject = fsManager.resolveFile(fullPath + FAIL_FILE_SUFFIX, fso);
@@ -547,8 +544,8 @@ public class Utils {
      *
      * @param failMarker the {@code <file>.fail} file object
      */
-    public static synchronized void releaseOrphanFailRecord(FileSystemManager fsManager, FileObject failMarker,
-                                                            FileSystemOptions fso) {
+    public static void releaseOrphanFailRecord(FileSystemManager fsManager, FileObject failMarker,
+                                               FileSystemOptions fso) {
         String markerPath = getFullPath(failMarker);
         if (!markerPath.endsWith(FAIL_FILE_SUFFIX)) {
             return;
@@ -593,8 +590,7 @@ public class Utils {
     }
 
     /**
-     * Removes the entries of the given file from the failed records file (including entries written by earlier
-     * versions, which contain only the base name).
+     * Removes the entries of the given file from the failed records file.
      */
     public static synchronized void removeFailedRecord(VFSConfig vfsConfig, FileObject fo) {
         String recordFile = vfsConfig.getFailedRecordFileDestination() + vfsConfig.getFailedRecordFileName();
@@ -607,7 +603,7 @@ public class Utils {
             List<String> content = FileUtils.readLines(failedRecordFile);
             List<String> remaining = new ArrayList<>();
             for (String line : content) {
-                if (!isRecordOf(line, key, fo.getName().getBaseName())) {
+                if (!isRecordOf(line, key)) {
                     remaining.add(line);
                 }
             }
@@ -780,10 +776,9 @@ public class Utils {
         File file = new File(failedFile);
         if (file.exists()) {
             String key = failedRecordKey(fileObject);
-            String baseName = fileObject.getName().getBaseName();
             try {
                 for (String line : FileUtils.readLines(file)) {
-                    if (isRecordOf(line, key, baseName)) {
+                    if (isRecordOf(line, key)) {
                         return true;
                     }
                 }

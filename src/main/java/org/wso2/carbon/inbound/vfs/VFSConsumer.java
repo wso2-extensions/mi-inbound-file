@@ -582,9 +582,18 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (locking && !lockManager.acquireLock(file)) {
             return;
         }
-        // same as processFile(): MoveAction uses this flag to choose rename or copy-and-delete
-        file.setIsMounted(isMounted);
         try {
+            // The marker was read before the lock was taken. Another poller may have handled this record since
+            // (marker removed or rewritten, or a new file with its own marker), so act only if it is unchanged.
+            if (locking && !content.equals(Utils.readFailRecord(fsManager, file, fso))) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Fail record of " + maskURLPassword(file.toString()) + " changed while waiting for "
+                            + "the lock. Skipping the retry.");
+                }
+                return;
+            }
+            // same as processFile(): MoveAction uses this flag to choose rename or copy-and-delete
+            file.setIsMounted(isMounted);
             if (VFSConstants.FAILED_ACTION_SUCCESS.equals(record.action)) {
                 postProcessingHandler.onSuccess(file);
             } else {
