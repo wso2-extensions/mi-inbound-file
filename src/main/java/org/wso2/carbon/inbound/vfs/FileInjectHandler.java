@@ -80,6 +80,8 @@ public class FileInjectHandler {
 
         FileObject file = (FileObject) object;
         InputStream in = null;
+        // set once the message is handed to mediation; errors after that are not about reading the polled file
+        boolean injected = false;
         try {
             org.apache.synapse.MessageContext msgCtx = createMessageContext();
             msgCtx.setProperty(SynapseConstants.INBOUND_ENDPOINT_NAME, name);
@@ -176,6 +178,7 @@ public class FileInjectHandler {
                 //     String.valueOf(vfsProperties.isAppendEnabled()));
                 // <<< APPEND MODE
 
+                injected = true;
                 synapseEnvironment.injectInbound(msgCtx, seq, sequential);
 
                 Map<String, Object> transportHeaders =
@@ -191,6 +194,13 @@ public class FileInjectHandler {
                 log.error("Sequence: " + injectingSeq + " not found");
             }
         } catch (Exception e) {
+            if (!injected && FileNotAvailableException.isFileNotFound(e)) {
+                // As in Synapse: the polled file is gone (e.g. moved by another process), so the caller skips the
+                // post-processing action instead of treating it as a failed file. A FileNotFoundException from
+                // mediation (e.g. a mediator reading another file) is a mediation failure.
+                throw new FileNotAvailableException("File is no longer available: "
+                        + Utils.maskURLPassword(String.valueOf(object)), e);
+            }
             log.error("Error while processing the file/folder", e);
             return false;
         } finally {

@@ -20,6 +20,7 @@ package org.wso2.carbon.inbound.vfs;
 
 import com.hierynomus.msdtyp.AccessMask;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.WordUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -39,6 +40,7 @@ import org.wso2.org.apache.commons.vfs2.util.DelegatingFileSystemOptionsBuilder;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -313,12 +315,18 @@ public class Utils {
         return moveToDirectoryURI;
     }
 
-    public static synchronized void addFailedRecord(VFSConfig vfsConfig,
-                                                    FileObject failedObject,
-                                                    String timeString, FileSystemManager fsManager) {
+    /**
+     * Adds the file to the failed records file.
+     *
+     * @return false if the failed records file could not be written (the caller records the failure another way)
+     */
+    public static synchronized boolean addFailedRecord(VFSConfig vfsConfig, FileObject failedObject,
+                                                       String timeString) {
         try {
-            String record = failedObject.getName().getBaseName() + VFSConstants.FAILED_RECORD_DELIMITER
-                    + timeString;
+            // keyed by the full (password-masked) URI, so that files with the same name in other folders are
+            // not affected
+            String key = failedRecordKey(failedObject);
+            String record = key + VFSConstants.FAILED_RECORD_DELIMITER + timeString;
             String recordFile = vfsConfig.getFailedRecordFileDestination() +
                     vfsConfig.getFailedRecordFileName();
             File failedRecordFile = new File(recordFile);
@@ -332,31 +340,59 @@ public class Utils {
                 }
             } else {
                 List<String> content = FileUtils.readLines(failedRecordFile);
-                if (!content.contains(record)) {
-                    content.add(record);
+                for (String line : content) {
+                    if (isRecordOf(line, key)) {
+                        return true;     // already recorded
+                    }
                 }
+                content.add(record);
                 FileUtils.writeLines(failedRecordFile, content);
             }
+            return true;
         } catch (IOException e) {
             VFSTransportErrorHandler.logException(log, VFSTransportErrorHandler.LogType.FATAL,
                     "Failure while writing the failed records!", e);
-            markFailRecord(fsManager, failedObject);
+            return false;
         }
+    }
+
+    /**
+     * Key of a file in the failed records file: its URI without query parameters, with the password masked.
+     */
+    private static String failedRecordKey(FileObject fo) {
+        return maskURLPassword(getFullPath(fo));
+    }
+
+    /**
+     * Whether a failed records line belongs to the given key. Lines written by earlier versions start with the
+     * base name only; they are not matched, so they cannot affect other files with the same name.
+     */
+    private static boolean isRecordOf(String line, String key) {
+        return line.startsWith(key + VFSConstants.FAILED_RECORD_DELIMITER);
     }
 
     public static String getSystemTime(String dateFormat) {
         return (new SimpleDateFormat(dateFormat)).format(new Date());
     }
 
-    public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo) {
-        markFailRecord(fsManager, fo, null);
-    }
+    /**
+     * Creates (or rewrites) the {@code <file>.fail} marker. The content is the current time in milliseconds and,
+     * when {@code failedAction} is given, {@code :<failedAction>:<lastModified>:<size>} of the data file, so that a
+     * later poll can retry only that action and can tell whether the file was replaced by a new one.
+     * Only the existence of the marker is checked to skip the file.
+     */
+    public static void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso,
+                                      String failedAction) {
 
-    public static synchronized void markFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
-
-        // generate a random fail value to ensure that there are no two parties
-        // processing the same file
-        byte[] failValue = (Long.toString((new Date()).getTime())).getBytes();
+        String failText = Long.toString((new Date()).getTime());
+        if (failedAction != null) {
+            failText += VFSConstants.STR_SPLITER + failedAction;
+            long[] identity = getFileIdentity(fo);
+            if (identity != null) {
+                failText += VFSConstants.STR_SPLITER + identity[0] + VFSConstants.STR_SPLITER + identity[1];
+            }
+        }
+        byte[] failValue = failText.getBytes();
 
         try {
             String fullPath = getFullPath(fo);
@@ -385,6 +421,200 @@ public class Utils {
             }
         } catch (FileSystemException fse) {
             log.error("Cannot get the lock for the file : " + maskURLPassword(fo.getName().getURI()) + " before processing");
+        }
+    }
+
+    /**
+     * Returns {lastModified, size} of the file, or null if they cannot be read.
+     */
+    public static long[] getFileIdentity(FileObject fo) {
+        try {
+            return new long[]{fo.getContent().getLastModifiedTime(), fo.getContent().getSize()};
+        } catch (FileSystemException e) {
+            if (log.isDebugEnabled()) {
+                log.debug("Couldn't read the last modified time and size of " + maskURLPassword(fo.toString()), e);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Content of a {@code .fail} marker: {@code <markedAt>[:<action>[:<lastModified>:<size>]]}.
+     * Markers written by earlier versions contain only {@code <markedAt>}.
+     */
+    public static final class FailRecord {
+        private static final java.util.regex.Pattern FORMAT = java.util.regex.Pattern.compile(
+                "^(\\d{13,})(?::(" + VFSConstants.FAILED_ACTION_SUCCESS + "|" + VFSConstants.FAILED_ACTION_FAILURE
+                        + "|" + VFSConstants.FAILED_ACTION_UNKNOWN + ")(?::(-?\\d+):(-?\\d+))?)?$");
+
+        public final long markedAt;
+        public final String action;          // null for markers of earlier versions
+        public final Long lastModified;      // null if not recorded
+        public final Long size;              // null if not recorded
+
+        private FailRecord(long markedAt, String action, Long lastModified, Long size) {
+            this.markedAt = markedAt;
+            this.action = action;
+            this.lastModified = lastModified;
+            this.size = size;
+        }
+
+        /**
+         * Parses marker content; returns null if the content is not a fail record (for example a data file that
+         * happens to end with {@code .fail}).
+         */
+        public static FailRecord parse(String content) {
+            if (content == null) {
+                return null;
+            }
+            Matcher m = FORMAT.matcher(content.trim());
+            if (!m.matches()) {
+                return null;
+            }
+            try {
+                return new FailRecord(Long.parseLong(m.group(1)), m.group(2),
+                        m.group(3) == null ? null : Long.valueOf(m.group(3)),
+                        m.group(4) == null ? null : Long.valueOf(m.group(4)));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        /**
+         * Whether the given file is still the file this record was written for. True when the identity was not
+         * recorded or cannot be read now.
+         */
+        public boolean isSameFile(FileObject fo) {
+            if (lastModified == null || size == null) {
+                return true;
+            }
+            long[] identity = getFileIdentity(fo);
+            return identity == null || (identity[0] == lastModified && identity[1] == size);
+        }
+    }
+
+    /**
+     * Returns the content of the {@code <file>.fail} marker, or null if there is no marker or it cannot be read.
+     */
+    public static String readFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
+        return readMarker(fsManager, getFullPath(fo) + FAIL_FILE_SUFFIX, fso);
+    }
+
+    private static String readMarker(FileSystemManager fsManager, String markerPath, FileSystemOptions fso) {
+        try {
+            FileObject failObject = fsManager.resolveFile(markerPath, fso);
+            try {
+                if (!failObject.exists()) {
+                    return null;
+                }
+                try (InputStream is = failObject.getContent().getInputStream()) {
+                    return new String(IOUtils.toByteArray(is)).trim();
+                }
+            } finally {
+                failObject.close();
+            }
+        } catch (IOException e) {
+            log.error("Couldn't read the fail record : " + maskURLPassword(markerPath), e);
+            return null;
+        }
+    }
+
+    /**
+     * Deletes the {@code <file>.fail} marker of the given file, if it exists.
+     */
+    public static void releaseFailRecord(FileSystemManager fsManager, FileObject fo, FileSystemOptions fso) {
+        String fullPath = getFullPath(fo);
+        try {
+            FileObject failObject = fsManager.resolveFile(fullPath + FAIL_FILE_SUFFIX, fso);
+            try {
+                if (failObject.exists()) {
+                    failObject.delete();
+                }
+            } finally {
+                failObject.close();
+            }
+        } catch (FileSystemException e) {
+            log.error("Couldn't remove the fail record of the file : " + maskURLPassword(fullPath), e);
+        }
+    }
+
+    /**
+     * Deletes a {@code .fail} marker whose data file no longer exists, so that it does not block a later file
+     * with the same name. Files that end with {@code .fail} but are not fail records are left alone.
+     *
+     * @param failMarker the {@code <file>.fail} file object
+     */
+    public static void releaseOrphanFailRecord(FileSystemManager fsManager, FileObject failMarker,
+                                               FileSystemOptions fso) {
+        String markerPath = getFullPath(failMarker);
+        if (!markerPath.endsWith(FAIL_FILE_SUFFIX)) {
+            return;
+        }
+        String dataPath = markerPath.substring(0, markerPath.length() - FAIL_FILE_SUFFIX.length());
+        try {
+            FileObject dataFile = fsManager.resolveFile(dataPath, fso);
+            try {
+                if (dataFile.exists() || !failMarker.exists()) {
+                    return;
+                }
+                if (FailRecord.parse(readMarker(fsManager, markerPath, fso)) == null) {
+                    return;     // not a fail record
+                }
+                failMarker.delete();
+                log.info("Removed the fail record of " + maskURLPassword(dataPath)
+                        + " as the file no longer exists");
+            } finally {
+                dataFile.close();
+            }
+        } catch (FileSystemException e) {
+            log.error("Couldn't check or remove the fail record : " + maskURLPassword(markerPath), e);
+        }
+    }
+
+    /**
+     * Deletes the {@code .fail} marker of a data file that no longer exists (used when the FileURI is a single
+     * file, so the marker is not seen in a directory listing).
+     */
+    public static void releaseOrphanFailRecordOf(FileSystemManager fsManager, FileObject dataFile,
+                                                 FileSystemOptions fso) {
+        try {
+            FileObject failMarker = fsManager.resolveFile(getFullPath(dataFile) + FAIL_FILE_SUFFIX, fso);
+            try {
+                releaseOrphanFailRecord(fsManager, failMarker, fso);
+            } finally {
+                failMarker.close();
+            }
+        } catch (FileSystemException e) {
+            log.error("Couldn't check the fail record of : " + maskURLPassword(getFullPath(dataFile)), e);
+        }
+    }
+
+    /**
+     * Removes the entries of the given file from the failed records file.
+     */
+    public static synchronized void removeFailedRecord(VFSConfig vfsConfig, FileObject fo) {
+        String recordFile = vfsConfig.getFailedRecordFileDestination() + vfsConfig.getFailedRecordFileName();
+        File failedRecordFile = new File(recordFile);
+        if (!failedRecordFile.exists()) {
+            return;
+        }
+        String key = failedRecordKey(fo);
+        try {
+            List<String> content = FileUtils.readLines(failedRecordFile);
+            List<String> remaining = new ArrayList<>();
+            for (String line : content) {
+                if (!isRecordOf(line, key)) {
+                    remaining.add(line);
+                }
+            }
+            if (remaining.size() != content.size()) {
+                FileUtils.writeLines(failedRecordFile, remaining);
+                if (log.isDebugEnabled()) {
+                    log.debug("Removed the fail record of '" + key + "' from the record file '" + recordFile + "'");
+                }
+            }
+        } catch (IOException e) {
+            log.error("Failure while removing '" + key + "' from the failed records file " + recordFile, e);
         }
     }
 
@@ -545,15 +775,10 @@ public class Utils {
                 entry.getFailedRecordFileName();
         File file = new File(failedFile);
         if (file.exists()) {
+            String key = failedRecordKey(fileObject);
             try {
-                List list = FileUtils.readLines(file);
-                for (Object aList : list) {
-                    String str = (String) aList;
-                    StringTokenizer st = new StringTokenizer(str,
-                            org.wso2.carbon.inbound.vfs.VFSConstants.FAILED_RECORD_DELIMITER);
-                    String fileName = st.nextToken();
-                    if (fileName != null &&
-                            fileName.equals(fileObject.getName().getBaseName())) {
+                for (String line : FileUtils.readLines(file)) {
+                    if (isRecordOf(line, key)) {
                         return true;
                     }
                 }

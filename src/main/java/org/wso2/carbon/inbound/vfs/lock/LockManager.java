@@ -18,6 +18,7 @@
 
 package org.wso2.carbon.inbound.vfs.lock;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.inbound.vfs.Utils;
@@ -193,11 +194,10 @@ public class LockManager {
     private void releaseLock(byte[] bLockValue, String sLockValue, FileObject lockObject,
                              Boolean autoLockReleaseSameNode, Long autoLockReleaseInterval) {
         try {
-            InputStream is = lockObject.getContent().getInputStream();
-            byte[] val = new byte[bLockValue.length];
-            // noinspection ResultOfMethodCallIgnored
-            is.read(val);
-            is.close();
+            byte[] val;
+            try (InputStream is = lockObject.getContent().getInputStream()) {
+                val = IOUtils.toByteArray(is);
+            }
             String strVal = new String(val);
             // Lock format random:hostname:hostip:time
             String[] arrVal = strVal.split(STR_SPLITER);
@@ -259,8 +259,7 @@ public class LockManager {
 
 
     private boolean verifyLock(byte[] lockValue, FileObject lockObject) {
-        try {
-            InputStream is = lockObject.getContent().getInputStream();
+        try (InputStream is = lockObject.getContent().getInputStream()) {
             byte[] val = new byte[lockValue.length];
             // noinspection ResultOfMethodCallIgnored
             is.read(val);

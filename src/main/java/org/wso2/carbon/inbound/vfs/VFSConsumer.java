@@ -43,8 +43,11 @@ import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executors;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.wso2.carbon.inbound.vfs.Utils.maskURLPassword;
@@ -54,6 +57,8 @@ public class VFSConsumer extends GenericPollingConsumer {
 
     private static final Log log = LogFactory.getLog(VFSConsumer.class);
     private static final String EMPTY_MD5 = "d41d8cd98f00b204e9800998ecf8427e";
+    // minimum age of a timestamp-only fail record before it is treated as one written by an earlier version
+    private static final long LEGACY_FAIL_RECORD_MIN_AGE = 60000L;
     private final VFSConfig vfsConfig;
     private final FileSelector fileSelector;
     private final PreProcessingHandler preProcessingHandler;
@@ -62,6 +67,8 @@ public class VFSConsumer extends GenericPollingConsumer {
     private final String name;
     private FileSystemManager fsManager = null;
     private ScheduledExecutorService retryScheduler;
+    // URIs of failed records (MoveAfterFailedMove) that already have a retry scheduled
+    private final Set<String> pendingFailedRecordRetries = ConcurrentHashMap.newKeySet();
     private boolean fileLock = true;
     private FileSystemOptions fso;
     private boolean readSubDirectories = false;
@@ -105,7 +112,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         initializeProperties();
 
         // Initialize retry scheduler for failed records
-        this.retryScheduler = Executors.newScheduledThreadPool(1);
+        this.retryScheduler = newRetryScheduler();
 
         // Handlers (wire your concrete actions here)
         this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment,
@@ -169,7 +176,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         initializeProperties();
 
         // Initialize retry scheduler for failed records
-        this.retryScheduler = Executors.newScheduledThreadPool(1);
+        this.retryScheduler = newRetryScheduler();
 
         // Handlers (wire your concrete actions here)
         this.fileInjectHandler = new FileInjectHandler(injectingSeq, onErrorSeq, sequential, synapseEnvironment,
@@ -246,10 +253,20 @@ public class VFSConsumer extends GenericPollingConsumer {
         try {
             if (root.getType() == FileType.FILE) {
                 // Single-file mode
-                processFile(root);
+                if (Utils.isFailRecord(fsManager, root, fso)) {
+                    retryFailedRecord(root);
+                } else if (Utils.isFailedRecordInFailedList(root, vfsConfig)) {
+                    scheduleFailedRecordRetry(root);
+                } else {
+                    processFile(root);
+                }
             } else if (root.getType() == FileType.FOLDER) {
                 // Directory mode (optional recursion)
                 processDirectory(root);
+            } else if (root.getType() == FileType.IMAGINARY) {
+                // Single-file mode and the file is absent: drop its fail record, so that it is not applied to
+                // the next file with this name
+                Utils.releaseOrphanFailRecordOf(fsManager, root, fso);
             } else {
                 // TODO: to handle FileType FILE_OR_FOLDER;
                 if (log.isDebugEnabled()) {
@@ -297,16 +314,23 @@ public class VFSConsumer extends GenericPollingConsumer {
                 return;
             }
             try {
-                // Skip lock/fail markers
+                // Skip lock/fail markers; remove fail markers whose file is gone
                 String base = child.getName().getBaseName();
-                if (base.endsWith(".lock") || base.endsWith(".fail")) {
+                if (base.endsWith(VFSConstants.LOCK_FILE_SUFFIX)) {
+                    continue;
+                }
+                if (base.endsWith(VFSConstants.FAIL_FILE_SUFFIX)) {
+                    Utils.releaseOrphanFailRecord(fsManager, child, fso);
                     continue;
                 }
 
-                // Check if this is a failed record
-                boolean isFailedRecord = Utils.isFailRecord(fsManager, child, fso) || Utils.isFailedRecordInFailedList(child, vfsConfig);
-                if (isFailedRecord) {
-                    // Handle failed record with retry mechanism
+                // A failed record: the file was processed but its post-processing action failed.
+                // Retry only that action; never inject the file again.
+                if (Utils.isFailRecord(fsManager, child, fso)) {
+                    retryFailedRecord(child);
+                    continue;
+                }
+                if (Utils.isFailedRecordInFailedList(child, vfsConfig)) {
                     scheduleFailedRecordRetry(child);
                     continue;
                 }
@@ -365,7 +389,7 @@ public class VFSConsumer extends GenericPollingConsumer {
         if (isClosed) {
             return;
         }
-        file.setIsMounted(vfsConfig.isFileLocking());
+        file.setIsMounted(isMounted);
         // Delegate readiness, age, size, pattern, etc. to FileSelector
         if (!fileSelector.isValidFile(file)) {
             if (log.isDebugEnabled()) {
@@ -386,69 +410,70 @@ public class VFSConsumer extends GenericPollingConsumer {
         }
 
         try {
-            // Pre-processing hook (e.g., acquire lock, tmp rename, etc.)
-            preProcessingHandler.handle(file);
+            boolean processed = false;
+            boolean mediated = false;
+            boolean runPostProcess = true;
+            try {
+                // Pre-processing hook (e.g., acquire lock, tmp rename, etc.)
+                preProcessingHandler.handle(file);
 
-            // Build transport headers
-            try (FileContent content = file.getContent()) {
-                String fileName = file.getName().getBaseName();
-                String filePath = file.getName().getPath();
-                String fileURI = file.getName().getURI();
+                // Build transport headers
+                try (FileContent content = file.getContent()) {
+                    String fileName = file.getName().getBaseName();
+                    String filePath = file.getName().getPath();
+                    String fileURI = file.getName().getURI();
 
-                Map<String, Object> headers = new HashMap<>();
-                headers.put(VFSConstants.FILE_NAME, fileName);
-                headers.put(VFSConstants.FILE_PATH, filePath);
-                headers.put(VFSConstants.FILE_URI, fileURI);
+                    Map<String, Object> headers = new HashMap<>();
+                    headers.put(VFSConstants.FILE_NAME, fileName);
+                    headers.put(VFSConstants.FILE_PATH, filePath);
+                    headers.put(VFSConstants.FILE_URI, fileURI);
 
-                // Add reply file information if configured
-                if (StringUtils.isNotEmpty(replyFileURI)) {
-                    headers.put(VFSConstants.REPLY_FILE_URI, replyFileURI);
-                }
-                if (StringUtils.isNotEmpty(replyFileName)) {
-                    headers.put(VFSConstants.REPLY_FILE_NAME, replyFileName);
-                }
-
-                // Add append mode flag
-                headers.put(VFSConstants.APPEND, String.valueOf(append));
-
-                try {
-                    headers.put(org.apache.synapse.commons.vfs.VFSConstants.FILE_LENGTH, content.getSize());
-                    headers.put(org.apache.synapse.commons.vfs.VFSConstants.LAST_MODIFIED, content.getLastModifiedTime());
-                } catch (FileSystemException ignore) {
-                    // length/mtime are best-effort
-                }
-
-                fileInjectHandler.setTransportHeaders(headers);
-                fileInjectHandler.setFileURI(fileURI);
-
-                boolean ok = fileInjectHandler.invoke(file, name);
-                if (ok) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("File processed successfully: " + maskURLPassword(file.toString()));
+                    // Add reply file information if configured
+                    if (StringUtils.isNotEmpty(replyFileURI)) {
+                        headers.put(VFSConstants.REPLY_FILE_URI, replyFileURI);
                     }
-                    postProcessingHandler.onSuccess(file);
+                    if (StringUtils.isNotEmpty(replyFileName)) {
+                        headers.put(VFSConstants.REPLY_FILE_NAME, replyFileName);
+                    }
+
+                    // Add append mode flag
+                    headers.put(VFSConstants.APPEND, String.valueOf(append));
+
+                    try {
+                        headers.put(org.apache.synapse.commons.vfs.VFSConstants.FILE_LENGTH, content.getSize());
+                        headers.put(org.apache.synapse.commons.vfs.VFSConstants.LAST_MODIFIED, content.getLastModifiedTime());
+                    } catch (FileSystemException ignore) {
+                        // length/mtime are best-effort
+                    }
+
+                    fileInjectHandler.setTransportHeaders(headers);
+                    fileInjectHandler.setFileURI(fileURI);
+
+                    processed = fileInjectHandler.invoke(file, name);
+                    mediated = true;
+                    if (log.isDebugEnabled()) {
+                        log.debug((processed ? "File processed successfully: " : "File processing failed: ")
+                                + maskURLPassword(file.toString()));
+                    }
+                }
+            } catch (Exception e) {
+                if (mediated) {
+                    // the error came after the file was injected (e.g. closing the content): run the action that
+                    // matches the mediation result
+                    log.error("Error processing file: " + maskURLPassword(file.toString()), e);
+                } else if (FileNotAvailableException.isFileNotFound(e) || !exists(file)) {
+                    // As in Synapse: the file was moved by another process, so there is nothing to post-process
+                    log.warn("File " + maskURLPassword(file.toString()) + " is no longer available. "
+                            + "It may have been moved by another process.");
+                    runPostProcess = false;
                 } else {
-                    // handle the failed records here too
-                    if (log.isDebugEnabled()) {
-                        log.debug("File processing failed: " + maskURLPassword(file.toString()));
-                    }
-                    postProcessingHandler.onFail(file);
+                    // As in the Synapse VFS transport and the MI file inbound endpoint, an error while reading the
+                    // file is a failed processing: the failure action runs
+                    log.error("Error processing file: " + maskURLPassword(file.toString()), e);
                 }
             }
-        } catch (Exception e) {
-            log.error("Error processing file: " + maskURLPassword(file.toString()), e);
-            try {
-                if (vfsConfig.getMoveAfterMoveFailure() != null) {
-                    String timeStamp =
-                            Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
-                    Utils.addFailedRecord(vfsConfig, file, timeStamp, fsManager);
-                } else {
-                    Utils.markFailRecord(fsManager, file, fso);
-                }
-            } catch (Exception failHandlingError) {
-                log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
-                // Mark as failed record if we couldn't handle the failure
-                Utils.markFailRecord(fsManager, file, fso);
+            if (runPostProcess) {
+                runPostProcessing(file, processed);
             }
         } finally {
             // Release lock if file locking is enabled and we shouldn't skip
@@ -462,12 +487,177 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     /**
+     * Runs the action after processing: the success action if the file was processed, otherwise the failure action.
+     * If the action itself fails, the file is recorded as a failed record so that only this action is retried
+     * later (the file is not injected again).
+     */
+    private void runPostProcessing(FileObject file, boolean processed) {
+        try {
+            if (processed) {
+                postProcessingHandler.onSuccess(file);
+            } else {
+                postProcessingHandler.onFail(file);
+            }
+        } catch (Exception e) {
+            log.error("Error in the " + (processed ? "success" : "failure") + " action for file: "
+                    + maskURLPassword(file.toString()) + ". The file is recorded as a failed record and "
+                    + (vfsConfig.getMoveAfterMoveFailure() != null
+                    ? "will be moved to the MoveAfterFailedMove location." : "the action will be retried."), e);
+            String failedAction = processed ? VFSConstants.FAILED_ACTION_SUCCESS : VFSConstants.FAILED_ACTION_FAILURE;
+            try {
+                if (vfsConfig.getMoveAfterMoveFailure() != null) {
+                    String timeStamp =
+                            Utils.getSystemTime(vfsConfig.getFailedRecordTimestampFormat());
+                    if (!Utils.addFailedRecord(vfsConfig, file, timeStamp)) {
+                        // the failed records file could not be written: fall back to a .fail marker
+                        log.warn("Could not add " + maskURLPassword(file.toString()) + " to the failed records "
+                                + "file. It is recorded with a " + VFSConstants.FAIL_FILE_SUFFIX + " file instead and "
+                                + "the " + (processed ? "success" : "failure") + " action will be retried.");
+                        Utils.markFailRecord(fsManager, file, fso, failedAction);
+                    }
+                } else {
+                    Utils.markFailRecord(fsManager, file, fso, failedAction);
+                }
+            } catch (Exception failHandlingError) {
+                log.error("Error in fail handling for file: " + maskURLPassword(file.toString()), failHandlingError);
+                // Mark as failed record if we couldn't handle the failure
+                Utils.markFailRecord(fsManager, file, fso, failedAction);
+            }
+        }
+    }
+
+    /**
+     * Handles a file that has a {@code .fail} marker: retries only the post-processing action that failed, at most
+     * once every {@code transport.vfs.FailedRecordNextRetryDuration} ms, without injecting the file again.
+     * When the action succeeds, the marker is removed. If the file was replaced by a new one since it was marked,
+     * the marker is removed and the new file is processed normally in the next poll.
+     */
+    private void retryFailedRecord(FileObject file) {
+        String content = Utils.readFailRecord(fsManager, file, fso);
+        if (content == null) {
+            return;
+        }
+        Utils.FailRecord record = Utils.FailRecord.parse(content);
+        if (record == null) {
+            // Not a complete marker, e.g. read while it is being rewritten (empty or cut off). Keep the file
+            // skipped and look again in the next poll.
+            if (log.isDebugEnabled()) {
+                log.debug("Fail record of " + maskURLPassword(file.toString()) + " is incomplete. Checking again "
+                        + "in the next poll.");
+            }
+            return;
+        }
+        if (record.action == null) {
+            // Only a timestamp: a marker from an earlier version, unless it is a marker of this version read while
+            // being written. Treat it as an earlier-version marker only when it is old enough; otherwise look again
+            // in the next poll.
+            long retryDuration = failedRecordNextRetryDuration == null ? 0 : failedRecordNextRetryDuration;
+            if (System.currentTimeMillis() - record.markedAt < Math.max(retryDuration, LEGACY_FAIL_RECORD_MIN_AGE)) {
+                return;
+            }
+            // The failed action is unknown. Rewrite it in the current format (keeps the file skipped, records its
+            // identity, and paces the warning below).
+            Utils.markFailRecord(fsManager, file, fso, VFSConstants.FAILED_ACTION_UNKNOWN);
+            warnUnknownFailRecord(file);
+            return;
+        }
+        if (!record.isSameFile(file)) {
+            Utils.releaseFailRecord(fsManager, file, fso);
+            log.info("File " + maskURLPassword(file.toString()) + " was replaced after it was recorded as a failed "
+                    + "record. The fail record is removed and the new file will be processed.");
+            return;
+        }
+        if (failedRecordNextRetryDuration != null
+                && System.currentTimeMillis() - record.markedAt < failedRecordNextRetryDuration) {
+            return;
+        }
+        if (VFSConstants.FAILED_ACTION_UNKNOWN.equals(record.action)) {
+            Utils.markFailRecord(fsManager, file, fso, VFSConstants.FAILED_ACTION_UNKNOWN);
+            warnUnknownFailRecord(file);
+            return;
+        }
+
+        boolean locking = vfsConfig.isFileLocking();
+        LockManager lockManager = new LockManager(locking, vfsConfig, fsManager, fso);
+        if (locking && !lockManager.acquireLock(file)) {
+            return;
+        }
+        try {
+            // The marker was read before the lock was taken. Another poller may have handled this record since
+            // (marker removed or rewritten, or a new file with its own marker), so act only if it is unchanged.
+            if (locking && !content.equals(Utils.readFailRecord(fsManager, file, fso))) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Fail record of " + maskURLPassword(file.toString()) + " changed while waiting for "
+                            + "the lock. Skipping the retry.");
+                }
+                return;
+            }
+            // same as processFile(): MoveAction uses this flag to choose rename or copy-and-delete
+            file.setIsMounted(isMounted);
+            if (VFSConstants.FAILED_ACTION_SUCCESS.equals(record.action)) {
+                postProcessingHandler.onSuccess(file);
+            } else {
+                postProcessingHandler.onFail(file);
+            }
+            Utils.releaseFailRecord(fsManager, file, fso);
+            log.info("Retried the post-processing action of failed record " + maskURLPassword(file.toString())
+                    + " successfully");
+        } catch (Exception e) {
+            // Rewrite the marker with the current time, so that the next attempt waits for the retry duration
+            Utils.markFailRecord(fsManager, file, fso, record.action);
+            log.warn("Retrying the " + (VFSConstants.FAILED_ACTION_SUCCESS.equals(record.action) ? "success"
+                    : "failure") + " action of failed record " + maskURLPassword(file.toString()) + " failed: "
+                    + e.getMessage() + ". It will be retried after " + failedRecordNextRetryDuration + " ms.");
+            if (log.isDebugEnabled()) {
+                log.debug("Retry failure of " + maskURLPassword(file.toString()), e);
+            }
+        } finally {
+            if (locking) {
+                lockManager.releaseLock(file);
+            }
+        }
+    }
+
+    private void warnUnknownFailRecord(FileObject file) {
+        log.warn("File " + maskURLPassword(file.toString()) + " has a fail record from an earlier version, so the "
+                + "action that failed is unknown and it is not retried. Handle the file manually and delete "
+                + maskURLPassword(Utils.getFullPath(file)) + VFSConstants.FAIL_FILE_SUFFIX + " to clear it.");
+    }
+
+    private boolean exists(FileObject file) {
+        try {
+            return file.exists();
+        } catch (FileSystemException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Creates the scheduler for failed record retries. On shutdown, retries that have not started yet are dropped
+     * (they are scheduled again by the next poll after the endpoint is resumed), so closing the endpoint does not
+     * wait for them; a retry that is already running is allowed to finish.
+     */
+    private static ScheduledExecutorService newRetryScheduler() {
+        ScheduledThreadPoolExecutor scheduler = new ScheduledThreadPoolExecutor(1);
+        scheduler.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        return scheduler;
+    }
+
+    /**
      * Schedule retry for failed record processing
      */
     private void scheduleFailedRecordRetry(FileObject file) {
-        if (failedRecordNextRetryDuration > 0) {
-            retryScheduler.schedule(new FailedRecordRetryTask(file),
-                    failedRecordNextRetryDuration, TimeUnit.MILLISECONDS);
+        // one pending retry per file, instead of a new task on every poll
+        String uri = file.getName().getURI();
+        if (failedRecordNextRetryDuration > 0 && pendingFailedRecordRetries.add(uri)) {
+            try {
+                retryScheduler.schedule(new FailedRecordRetryTask(file),
+                        failedRecordNextRetryDuration, TimeUnit.MILLISECONDS);
+            } catch (RejectedExecutionException e) {
+                // the endpoint is closing; the next poll after it is resumed schedules the retry again
+                pendingFailedRecordRetries.remove(uri);
+                return;
+            }
             if (log.isDebugEnabled()) {
                 log.debug("Scheduled retry for failed record: " + maskURLPassword(file.toString()) +
                         " after " + failedRecordNextRetryDuration + "ms");
@@ -476,19 +666,19 @@ public class VFSConsumer extends GenericPollingConsumer {
     }
 
     /**
-     * Remove file from failed records
+     * Moves a failed record to the MoveAfterFailedMove location and removes it from the failed records file.
      */
     private void removeFromFailedRecords(FileObject file) {
-        // Implementation to remove from failed records tracking
-        if (log.isDebugEnabled()) {
-            log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
-        }
         try {
             if (vfsConfig.getMoveAfterMoveFailure() != null) {
+                file.setIsMounted(isMounted);
                 MoveAction moveAction = new MoveAction(vfsConfig.getMoveAfterMoveFailure(), vfsConfig, fsManager);
                 moveAction.execute(file);
             }
-            //TODO: remove failed record from the list file.
+            Utils.removeFailedRecord(vfsConfig, file);
+            if (log.isDebugEnabled()) {
+                log.debug("Removed file from failed records: " + maskURLPassword(file.toString()));
+            }
         } catch (FileSystemException e) {
             VFSTransportErrorHandler.handleException(log, "Error moving file during failed record removal: " +
                     maskURLPassword(file.toString()), e);
@@ -619,6 +809,8 @@ public class VFSConsumer extends GenericPollingConsumer {
     public void close() {
         isClosed = true;
         fsManager.close();
+        // retries still waiting are dropped below; the next poll after resume() schedules them again
+        pendingFailedRecordRetries.clear();
         if (retryScheduler != null && !retryScheduler.isShutdown()) {
             retryScheduler.shutdown();
             try {
@@ -644,7 +836,8 @@ public class VFSConsumer extends GenericPollingConsumer {
     public void resume() {
         try {
             ((StandardFileSystemManager) fsManager).init();
-            retryScheduler = Executors.newScheduledThreadPool(1);
+            pendingFailedRecordRetries.clear();
+            retryScheduler = newRetryScheduler();
             isClosed = false;
         } catch (FileSystemException e) {
             log.error("Error re-initializing VFS FileSystemManager on resume", e);
@@ -679,6 +872,7 @@ public class VFSConsumer extends GenericPollingConsumer {
 
         @Override
         public void run() {
+            boolean retryLater = false;
             try {
                 if (log.isDebugEnabled()) {
                     log.debug("Retrying failed record: " + maskURLPassword(file.toString()));
@@ -692,9 +886,16 @@ public class VFSConsumer extends GenericPollingConsumer {
                     if (log.isDebugEnabled()) {
                         log.debug("Failed record file no longer exists: " + maskURLPassword(file.toString()));
                     }
+                    // the entry would otherwise block a later file with the same name
+                    Utils.removeFailedRecord(vfsConfig, file);
                 }
             } catch (Exception e) {
                 log.error("Error during failed record retry: " + maskURLPassword(file.toString()), e);
+                retryLater = true;
+            } finally {
+                pendingFailedRecordRetries.remove(file.getName().getURI());
+            }
+            if (retryLater) {
                 // Schedule another retry if configured
                 scheduleFailedRecordRetry(file);
             }
