@@ -342,8 +342,8 @@ public final class FileTask {
         }
         ReplySender reply = new ReplySender(services.config, session, generation, services.writer, services.locks,
                 services.log);
-        content = new FileInjectHandler.Content(source, identity, services.store, generation, session, services.endpoint,
-                reply, services.log);
+        content = new FileInjectHandler.Content(source, identity, generation, session, services.endpoint, reply,
+                services.log);
         Map<String, Object> headers = headers();
         String name = (String) headers.get(VFSConstants.FILE_NAME);
         boolean success = services.inject.invoke(seq, services.endpoint, headers, content);

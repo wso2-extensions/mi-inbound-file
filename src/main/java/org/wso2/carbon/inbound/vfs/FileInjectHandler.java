@@ -47,7 +47,6 @@ import org.wso2.carbon.inbound.vfs.conn.VfsSession;
 import org.wso2.carbon.inbound.vfs.poll.Generation;
 import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.util.TestPoints;
-import org.wso2.vfs.shared.failstate.FailStateStore;
 import org.wso2.vfs.shared.failstate.FileIdentity;
 
 import javax.mail.internet.ContentType;
@@ -85,7 +84,6 @@ public class FileInjectHandler {
     public static final class Content implements AutoCloseable {
         private final FileObject file;
         private final FileIdentity identity;
-        private final FailStateStore store;
         private final Generation generation;
         private final VfsSession session;
         private final String endpoint;
@@ -96,11 +94,10 @@ public class FileInjectHandler {
         private IOException openFailure;
         private long openMillis;
 
-        public Content(FileObject file, FileIdentity identity, FailStateStore store, Generation generation,
-                       VfsSession session, String endpoint, ReplySender reply, NamedLog log) {
+        public Content(FileObject file, FileIdentity identity, Generation generation, VfsSession session,
+                       String endpoint, ReplySender reply, NamedLog log) {
             this.file = file;
             this.identity = identity;
-            this.store = store;
             this.generation = generation;
             this.session = session;
             this.endpoint = endpoint;
@@ -123,8 +120,7 @@ public class FileInjectHandler {
                     throw new IOException("The file generation has retired.");
                 }
                 InputStream input = file.getContent().getInputStream();
-                RecordingInputStream stream = new RecordingInputStream(
-                        store.digesting(input, identity, generation::progress), generation, threshold,
+                RecordingInputStream stream = new RecordingInputStream(input, generation, threshold,
                         count -> session.contentBarrier(file.getFileSystem(), count));
                 opened.add(stream);
                 // A builder that reads in small steps takes them from this buffer, so the streams below read in

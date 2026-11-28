@@ -56,6 +56,9 @@ public final class RecordingInputStream extends FilterInputStream {
 
     private void advance(int size) {
         count += size;
+        if (size > 0) {
+            generation.progress(size);
+        }
         if (!reached && threshold >= 0 && count >= threshold) {
             reached = true;
             barrier.accept(count);

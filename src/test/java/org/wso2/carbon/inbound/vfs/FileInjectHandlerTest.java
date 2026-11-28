@@ -66,8 +66,6 @@ import org.wso2.org.apache.commons.vfs2.FileContent;
 import org.wso2.org.apache.commons.vfs2.FileName;
 import org.wso2.org.apache.commons.vfs2.FileObject;
 import org.wso2.org.apache.commons.vfs2.VFS;
-import org.wso2.vfs.shared.failstate.DigestingInputStream;
-import org.wso2.vfs.shared.failstate.FailStateStore;
 import org.wso2.vfs.shared.failstate.FileIdentity;
 import org.wso2.vfs.shared.log.NamedLog;
 import org.wso2.vfs.shared.log.RepeatLimiter;
@@ -80,7 +78,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -112,17 +109,14 @@ import static org.mockito.Mockito.when;
  */
 class FileInjectHandlerTest {
 
-    // The SHA-256 of zero bytes.
-    private static final String EMPTY_DIGEST = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
     private static final String ENDPOINT = "inject";
 
     @TempDir
     Path folder;
 
     // An empty file builds an empty envelope and goes into mediation once. The content is read through the real
-    // digest and record streams, from a provider stream that closes itself at the end of the file, as the SFTP stream
-    // of the provider does. A SOAP type in upper case, a type with no builder in any case, and no type with an extension
+    // record stream, from a provider stream that closes itself at the end of the file, as the SFTP stream of the
+    // provider does. A SOAP type in upper case, a type with no builder in any case, and no type with an extension
     // other than xml and txt reach the SOAP builder as a type that it does not take as SOAP or REST. It then gives no
     // element for an empty file, and the transport makes an empty envelope of that.
     @ParameterizedTest
@@ -172,15 +166,12 @@ class FileInjectHandlerTest {
             return true;
         });
 
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         NamedLog log = NamedLog.inbound(LogFactory.getLog(FileInjectHandlerTest.class), ENDPOINT, new RepeatLimiter());
         FileObject file = VFS.getManager().resolveFile(empty.toUri().toString());
         FileIdentity identity = new FileIdentity(file.getName().getURI(), 0,
                 Files.getLastModifiedTime(empty).toMillis(), FileIdentity.TimeSource.LISTING, null);
         FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content content = new FileInjectHandler.Content(file, identity, store,
+        try (FileInjectHandler.Content content = new FileInjectHandler.Content(file, identity,
                 mock(Generation.class), mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             assertTrue(handler.invoke(sequence, ENDPOINT, new HashMap<>(), content));
             assertNull(content.readFailure());
@@ -189,7 +180,6 @@ class FileInjectHandlerTest {
         }
         assertEquals(1, injected.size());
         assertNull(injected.get(0).getBody().getFirstElement());
-        assertEquals(EMPTY_DIGEST, identity.digest());
     }
 
     // A file that the builder refuses has its own ERROR line, which names the file with the password masked. Two
@@ -268,9 +258,6 @@ class FileInjectHandlerTest {
             message.setConfigurationContext(context);
             return new Axis2MessageContext(message, configuration, environment);
         });
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         FileName fileName = VFS.getManager().resolveURI("sftp://user:secret@host/in/" + name);
         FileObject file = mock(FileObject.class);
         FileContent content = mock(FileContent.class);
@@ -280,7 +267,7 @@ class FileInjectHandlerTest {
                 new ByteArrayInputStream("not xml".getBytes(StandardCharsets.UTF_8)));
         FileIdentity identity = new FileIdentity(fileName.getURI(), 7, 0, FileIdentity.TimeSource.LISTING, null);
         FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content files = new FileInjectHandler.Content(file, identity, store,
+        try (FileInjectHandler.Content files = new FileInjectHandler.Content(file, identity,
                 mock(Generation.class), mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             boolean result = handler.invoke(sequence, ENDPOINT, new HashMap<>(), files);
             assertNull(files.readFailure());
@@ -336,15 +323,12 @@ class FileInjectHandlerTest {
             formatter.writeTo(message, BaseUtils.getOMOutputFormat(message), written, false);
             return true;
         });
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         NamedLog log = NamedLog.inbound(LogFactory.getLog(FileInjectHandlerTest.class), ENDPOINT, new RepeatLimiter());
         FileObject source = VFS.getManager().resolveFile(file.toUri().toString());
         FileIdentity identity = new FileIdentity(source.getName().getURI(), Files.size(file),
                 Files.getLastModifiedTime(file).toMillis(), FileIdentity.TimeSource.LISTING, null);
         FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity, store,
+        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity,
                 mock(Generation.class), mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             assertTrue(handler.invoke(sequence, ENDPOINT, new HashMap<>(), files));
         } finally {
@@ -396,15 +380,12 @@ class FileInjectHandlerTest {
             injected.add(((Axis2MessageContext) call.getArgument(0)).getEnvelope());
             return true;
         });
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         NamedLog log = NamedLog.inbound(LogFactory.getLog(FileInjectHandlerTest.class), ENDPOINT, new RepeatLimiter());
         FileObject source = VFS.getManager().resolveFile(file.toUri().toString());
         FileIdentity identity = new FileIdentity(source.getName().getURI(), Files.size(file),
                 Files.getLastModifiedTime(file).toMillis(), FileIdentity.TimeSource.LISTING, null);
         FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity, store,
+        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity,
                 mock(Generation.class), mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             assertTrue(handler.invoke(sequence, ENDPOINT, new HashMap<>(), files));
         } finally {
@@ -415,9 +396,9 @@ class FileInjectHandlerTest {
     }
 
     // A builder that marks the content, reads its start and resets it, then reads the content to its end. It gets the
-    // whole file after the reset, and the hash in the identity is the hash of the whole file.
+    // whole file after the reset.
     @Test
-    void aBuilderThatMarksAndResetsGetsTheWholeFileAndItsHash() throws Exception {
+    void aBuilderThatMarksAndResetsGetsTheWholeFile() throws Exception {
         byte[] payload = new byte[20000];
         new Random(5).nextBytes(payload);
         Path path = Files.write(folder.resolve("m.dat"), payload);
@@ -431,16 +412,30 @@ class FileInjectHandlerTest {
             file.close();
         }
         assertArrayEquals(payload, builder.content.toByteArray());
-        StringBuilder hash = new StringBuilder();
-        for (byte value : MessageDigest.getInstance("SHA-256").digest(payload)) {
-            hash.append(String.format("%02x", value));
+    }
+
+    // The read makes no hash of the content, so the identity has none after a read of the whole file.
+    @Test
+    void aFullReadLeavesNoHashInTheIdentity() throws Exception {
+        byte[] payload = new byte[20000];
+        new Random(9).nextBytes(payload);
+        Path path = Files.write(folder.resolve("h.dat"), payload);
+        FileObject file = VFS.getManager().resolveFile(path.toUri().toString());
+        FileIdentity identity = new FileIdentity(file.getName().getURI(), payload.length,
+                Files.getLastModifiedTime(path).toMillis(), FileIdentity.TimeSource.LISTING, null);
+        StepBuilder builder = new StepBuilder(0);
+        try {
+            assertTrue(read(file, identity, mock(Generation.class), builder), String.valueOf(builder.failure));
+        } finally {
+            file.close();
         }
-        assertEquals(hash.toString(), identity.digest());
+        assertArrayEquals(payload, builder.content.toByteArray());
+        assertNull(identity.digest());
     }
 
     // The relay builder of the pack reads the content in steps of 1 KiB. The steps come from a buffer of 8 KiB above
-    // the record and digest streams. So the provider stream, and every stream above it up to the buffer, sees one read
-    // of 8 KiB for each 8 KiB of the file and one more read at its end. The progress of the read is marked once for
+    // the record stream. So the provider stream and the record stream see one read of 8 KiB for each 8 KiB of the
+    // file and one more read at its end. The progress of the read is marked once for
     // each 8 KiB.
     @Test
     void stepsOf1KiBReachTheProviderStreamAsReadsOf8KiB() throws Exception {
@@ -478,7 +473,7 @@ class FileInjectHandlerTest {
     }
 
     // Mediates one file under application/octet-stream with the given builder. The content is read through the real
-    // digest and record streams.
+    // record stream.
     private boolean read(FileObject file, FileIdentity identity, Generation generation, Builder builder)
             throws Exception {
         Properties properties = new Properties();
@@ -501,12 +496,9 @@ class FileInjectHandlerTest {
             return new Axis2MessageContext(message, configuration, environment);
         });
         when(environment.injectInbound(any(), same(sequence), eq(true))).thenReturn(true);
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         NamedLog log = NamedLog.inbound(LogFactory.getLog(FileInjectHandlerTest.class), ENDPOINT, new RepeatLimiter());
         FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content content = new FileInjectHandler.Content(file, identity, store, generation,
+        try (FileInjectHandler.Content content = new FileInjectHandler.Content(file, identity, generation,
                 mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             boolean result = handler.invoke(sequence, ENDPOINT, new HashMap<>(), content);
             assertNull(content.readFailure());
@@ -602,14 +594,11 @@ class FileInjectHandlerTest {
             run.message = call.getArgument(0);
             return engine.injectInbound(run.message, sequence, true);
         });
-        FailStateStore store = mock(FailStateStore.class);
-        when(store.digesting(any(), any(), any())).thenAnswer(call ->
-                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
         FileObject source = VFS.getManager().resolveFile(file.toUri().toString());
         FileIdentity identity = new FileIdentity(source.getName().getURI(), Files.size(file),
                 Files.getLastModifiedTime(file).toMillis(), FileIdentity.TimeSource.LISTING, null);
         FileInjectHandler handler = new FileInjectHandler("process", "error", environment, new VFSConfig(properties));
-        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity, store,
+        try (FileInjectHandler.Content files = new FileInjectHandler.Content(source, identity,
                 mock(Generation.class), mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
             run.processed = handler.invoke(sequence, ENDPOINT, new HashMap<>(), files);
             assertNull(files.readFailure());

@@ -549,7 +549,7 @@ class FileTaskTest {
                 }).when(environment).injectInbound(same(message), same(sequence), eq(true));
                 FileIdentity identity = new FileIdentity(uri, payload.length, Files.getLastModifiedTime(file).toMillis(),
                         FileIdentity.TimeSource.COMMAND, null);
-                try (FileInjectHandler.Content content = new FileInjectHandler.Content(object, identity, store, generation,
+                try (FileInjectHandler.Content content = new FileInjectHandler.Content(object, identity, generation,
                         session, endpoint, mock(org.wso2.carbon.inbound.vfs.reply.ReplySender.class), health.namedLog())) {
                     assertEquals(scenario == 0, handler.invoke(sequence, endpoint, headers, content));
                     assertNull(content.readFailure());
