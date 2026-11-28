@@ -285,8 +285,12 @@ public final class MoveAction {
                 currentParameter = spec.parameter;
                 currentUri = target.fileUri;
                 start = System.nanoTime();
-                FailStateStore.Comparison comparison = store.compareTarget(session.lockIo(spec.parameter), identity,
-                        target.fileUri);
+                // A commit leaves the source in place, so with no hash in the identity the store hashes the source
+                // again through its own connection. A rename comes here only when its source is gone.
+                LockIo sourceIo = result.step == ActionResult.Step.RENAME ? null
+                        : session.lockIo(TRANSPORT_FILE_FILE_URI);
+                FailStateStore.Comparison comparison = store.compareTarget(session.lockIo(spec.parameter), sourceIo,
+                        identity, target.fileUri);
                 if (comparison.match == FailStateStore.Match.TRANSPORT_ERROR) {
                     resetCurrent(comparison.failure);
                     return result;
