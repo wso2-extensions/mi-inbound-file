@@ -18,22 +18,31 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.wso2.org.apache.commons.vfs2.FileObject;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
 
-public class SizeFilter implements Filter {
-    VFSConfig vfsConfig;
+public final class SizeFilter {
+    private final double limit;
+    private final Consumer<String> info;
+    private final Set<String> reported = new HashSet<>();
 
-    public SizeFilter(VFSConfig vfsConfig) {
-        this.vfsConfig = vfsConfig;
+    public SizeFilter(double limit, Consumer<String> info) {
+        this.limit = limit;
+        this.info = info;
     }
 
-    @Override
-    public boolean accept(FileObject fileObject) {
-        try {
-            return vfsConfig.getFileSizeLimit() >= 0 && fileObject.getContent().getSize() < vfsConfig.getFileSizeLimit();
-        } catch (Exception e) {
-            return false;
+    public boolean accept(String uri, long bytes) {
+        if (limit < 0 || bytes <= limit) {
+            return true;
         }
+        if (reported.add(uri)) {
+            info.accept("File exceeds the size limit. " + uri);
+        }
+        return false;
+    }
+
+    void retain(Set<String> present) {
+        reported.retainAll(present);
     }
 }

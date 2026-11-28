@@ -18,48 +18,37 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.wso2.org.apache.commons.vfs2.FileObject;
-import org.wso2.org.apache.commons.vfs2.FileSystemException;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.function.Consumer;
 
-/**
- * Filter to filter files based on age.
- */
-public class AgeFilter implements Filter {
-    VFSConfig vfsConfig;
-    private Log log = LogFactory.getLog(AgeFilter.class);
+public final class AgeFilter {
+    private final Long minimum;
+    private final Long maximum;
+    private final Consumer<String> warn;
+    private final Set<String> unknownTime = new HashSet<>();
 
-    public AgeFilter(VFSConfig vfsConfig) {
-        this.vfsConfig = vfsConfig;
+    public AgeFilter(Long minimum, Long maximum, Consumer<String> warn) {
+        this.minimum = minimum;
+        this.maximum = maximum;
+        this.warn = warn;
     }
 
-    @Override
-    public boolean accept(FileObject fileObject) {
-        boolean isAccepted = false;
-        if (vfsConfig.getMinimumAge() != null) {
-            long age = 0;
-            try {
-                age = fileObject.getContent().getLastModifiedTime();
-            } catch (FileSystemException e) {
-                log.info("Error in getting the last modified time of the file");
-                return false;
-            }
-            long time = System.currentTimeMillis();
-            isAccepted = (time - age) / 1000 <= vfsConfig.getMinimumAge();
+    public boolean accept(String uri, long modified, long now) {
+        if (minimum == null && maximum == null) {
+            return true;
         }
-        if (vfsConfig.getMaximumAge() != null) {
-            long age = 0;
-            try {
-                age = fileObject.getContent().getLastModifiedTime();
-            } catch (FileSystemException e) {
-                log.info("Error in getting the last modified time of the file");
-                return false;
+        if (modified == 0) {
+            if (unknownTime.add(uri)) {
+                warn.accept("The listing has no modified time for " + uri);
             }
-            long time = System.currentTimeMillis();
-            isAccepted = (time - age) / 1000 >= vfsConfig.getMaximumAge();
+            return maximum == null;
         }
-        return isAccepted;
+        long seconds = (now - modified) / 1000L;
+        return (minimum == null || seconds > minimum) && (maximum == null || seconds < maximum);
+    }
+
+    void retain(Set<String> present) {
+        unknownTime.retainAll(present);
     }
 }

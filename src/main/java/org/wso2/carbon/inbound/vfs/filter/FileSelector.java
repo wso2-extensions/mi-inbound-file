@@ -18,43 +18,37 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.wso2.org.apache.commons.vfs2.FileObject;
-import org.wso2.org.apache.commons.vfs2.FileSystemManager;
+import org.wso2.vfs.shared.log.NamedLog;
+import org.wso2.vfs.shared.log.UriMask;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 
-/**
- * Class to select files based on multiple filters.
- */
-public class FileSelector {
+public final class FileSelector {
+    private static final Log LOG = LogFactory.getLog(FileSelector.class);
+    private final FileNameFilter names;
+    private final SizeFilter size;
+    private final AgeFilter age;
+    private final boolean ignoreEmpty;
 
-    private final List<Filter> filters;
-
-    public FileSelector(VFSConfig config, FileSystemManager fsManager) {
-        filters = new ArrayList<>();
-        if (StringUtils.isNotEmpty(config.getFileNamePattern())) {
-            filters.add(new FileNameFilter(config));
-        }
-        if (config.getFileSizeLimit() > 0) {
-            filters.add(new SizeFilter(config));
-        }
-        if (config.getCheckSizeInterval() > 0) {
-            filters.add(new SizeCheckFilter(config, fsManager));
-        }
-        if ((config.getMaximumAge() != null) || (config.getMinimumAge() != null)) {
-            filters.add(new AgeFilter(config));
-        }
+    public FileSelector(VFSConfig config, String endpoint, NamedLog log) {
+        names = new FileNameFilter(config.getFileNamePattern());
+        String prefix = "[inbound:" + UriMask.mask(endpoint).replaceAll("\\R", " ") + "] ";
+        size = new SizeFilter(config.getFileSizeLimit(),
+                message -> LOG.info(prefix + UriMask.mask(message).replaceAll("\\R", " ")));
+        age = new AgeFilter(config.getMinimumAge(), config.getMaximumAge(), log::warn);
+        ignoreEmpty = config.getCheckSizeIgnoreEmpty();
     }
 
-    public boolean isValidFile(FileObject fileObject) {
-        for (Filter filter : filters) {
-            if (!filter.accept(fileObject)) {
-                return false;
-            }
-        }
-        return true;
+    public boolean accept(String uri, String name, long bytes, long modified, long now) {
+        return names.accept(name) && size.accept(uri, bytes) && age.accept(uri, modified, now)
+                && (!ignoreEmpty || bytes != 0);
+    }
+
+    public void retain(Set<String> present) {
+        size.retain(present);
+        age.retain(present);
     }
 }

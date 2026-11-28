@@ -17,6 +17,675 @@
     ],
     "releases": [
         {
+            "tagName": "v1.0.0",
+            "products": [
+                "MI 4.5.0",
+                "MI 4.6.0",
+                "MI 4.7.0"
+            ],
+            "operations": [
+                {
+                    "name": "init",
+                    "description": "Initialize File Inbound Endpoint",
+                    "params": [
+                        {
+                            "name": "name",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "class",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "org.wso2.carbon.inbound.vfs.VFSConsumer",
+                            "description": ""
+                        },
+                        {
+                            "name": "generateSequences",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "sequence",
+                            "type": "keyOrExpression",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "onError",
+                            "type": "keyOrExpression",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "suspend",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "False",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FileURI",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "scheduleType",
+                            "type": "combo",
+                            "required": true,
+                            "defaultValue": "Polling",
+                            "description": "The polling type for the connection."
+                        },
+                        {
+                            "name": "interval",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "The interval for the connection."
+                        },
+                        {
+                            "name": "cronExpression",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "The cron for the connection."
+                        },
+                        {
+                            "name": "transport.vfs.ContentType",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FileNamePattern",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "fileThrottlingType",
+                            "type": "combo",
+                            "required": true,
+                            "defaultValue": "Count",
+                            "description": "Choose how file processing is controlled."
+                        },
+                        {
+                            "name": "transport.vfs.FileProcessCount",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Maximum number of files to process in a single polling cycle."
+                        },
+                        {
+                            "name": "transport.vfs.FileProcessInterval",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Delay (in milliseconds) between processing consecutive files."
+                        },
+                        {
+                            "name": "sequential",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "coordination",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.WorkerPoolSize",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "4"
+                        },
+                        {
+                            "name": "transport.vfs.ActionAfterProcess",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "DELETE",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.MoveAfterProcess",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "URI for the target location."
+                        },
+                        {
+                            "name": "transport.vfs.MoveTimestampFormat",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.ActionAfterFailure",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "DELETE",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.MoveAfterFailure",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "URI for the target location for failed files."
+                        },
+                        {
+                            "name": "transport.vfs.MoveAfterFailedMove",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FailedRecordsFileName",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Deprecated. Used for migration from older configurations."
+                        },
+                        {
+                            "name": "transport.vfs.FailedRecordsFileDestination",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Deprecated. Used for migration from older configurations."
+                        },
+                        {
+                            "name": "transport.vfs.MoveFailedRecordTimestampFormat",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Deprecated. Used for migration from older configurations."
+                        },
+                        {
+                            "name": "transport.vfs.ReplyFileURI",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.ReplyFileName",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "response.xml"
+                        },
+                        {
+                            "name": "transport.vfs.Append",
+                            "type": "checkbox",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "False"
+                        },
+                        {
+                            "name": "transport.vfs.CreateFolder",
+                            "type": "checkbox",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "False"
+                        },
+                        {
+                            "name": "transport.vfs.MaxRetryCount",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "3",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.ReconnectTimeout",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "30s",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FailedRecordNextRetryDuration",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "30000",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.Locking",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "enable",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.AutoLockRelease",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.AutoLockReleaseInterval",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Deprecated. Used for migration from older configurations."
+                        },
+                        {
+                            "name": "transport.vfs.LockReleaseSameNode",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.MaxReadTransportErrors",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "3"
+                        },
+                        {
+                            "name": "transport.vfs.StopTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "60s"
+                        },
+                        {
+                            "name": "transport.vfs.LockStaleAge",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "900000"
+                        },
+                        {
+                            "name": "transport.vfs.FailedRecordFlagAfterRetries",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "12"
+                        },
+                        {
+                            "name": "transport.vfs.SFTPIdentities",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPIdentityPassPhrase",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPUserDirIsRoot",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FileSortAttribute",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.FileSortAscending",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.CheckSizeIgnoreEmpty",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "False",
+                            "description": "When true, empty files are ignored during file size checks."
+                        },
+                        {
+                            "name": "transport.vfs.CheckSizeInterval",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Duration in milliseconds between file size checks."
+                        },
+                        {
+                            "name": "transport.vfs.MinimumAge",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Minimum age in seconds since the last modification before processing a file."
+                        },
+                        {
+                            "name": "transport.vfs.MaximumAge",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Maximum age in seconds since the last modification; older files will be skipped."
+                        },
+                        {
+                            "name": "transport.vfs.FileSizeLimit",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "-1",
+                            "description": "Process files whose size is \u2264 this value (in bytes). Use -1 for unlimited."
+                        },
+                        {
+                            "name": "transport.vfs.SubFolderTimestampFormat",
+                            "type": "string",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.Streaming",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "False",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.Build",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "False",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.UpdateLastModified",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "True",
+                            "description": ""
+                        },
+                        {
+                            "name": "transport.vfs.waitTimeBeforeRead",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.IsMounted",
+                            "type": "checkbox",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "False"
+                        },
+                        {
+                            "name": "transport.vfs.TempFolderName",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ".part"
+                        },
+                        {
+                            "name": "transport.vfs.TempFileSuffix",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ".part"
+                        },
+                        {
+                            "name": "transport.vfs.ResolveHostsDynamically",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPSessionTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPKeepAliveCount",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPConnectTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.FTPConnectTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.FTPSocketTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.FTPDataTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SMB2ReadTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SMB2WriteTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SMB2TransactTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.WriteStallTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPKeyExchangeAlgorithms",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPHostKeyAlgorithms",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPCiphers",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPMacs",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.SFTPPubkeyAcceptedAlgorithms",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.passive",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.implicit",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.protection",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.ssl.keystore",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.ssl.truststore",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.ssl.kspassword",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.ssl.tspassword",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.ssl.keypassword",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "filetype",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.EncryptionEnabled",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "vfs.diskShareAccessMask",
+                            "type": "string",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.AvoidPermissionCheck",
+                            "type": "checkbox",
+                            "required": false,
+                            "description": "",
+                            "defaultValue": "True"
+                        },
+                        {
+                            "name": "transport.vfs.ActionAfterErrors",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.MoveAfterErrors",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.DistributedLock",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.DistributedTimeout",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        },
+                        {
+                            "name": "transport.vfs.ClusterAware",
+                            "type": "string",
+                            "required": false,
+                            "description": "Deprecated. Ignored when set.",
+                            "defaultValue": ""
+                        }
+                    ],
+                    "isHidden": false
+                }
+            ],
+            "connections": []
+        },
+        {
             "tagName": "v0.9.4",
             "products": [
                 "MI 4.5.0",

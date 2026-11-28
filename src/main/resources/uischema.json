@@ -122,7 +122,7 @@
               "inputType": "string",
               "defaultValue": "",
               "required": "true",
-              "helpTip": "The interval for the connection.",
+              "helpTip": "The time between two polls, in milliseconds.",
               "enableCondition": [
                 {
                   "scheduleType": "Polling"
@@ -203,7 +203,7 @@
               "name": "transport.vfs.FileProcessInterval",
               "displayName": "File Process Interval (ms)",
               "inputType": "string",
-              "defaultValue": "0",
+              "defaultValue": "",
               "required": "true",
               "helpTip": "Delay (in milliseconds) between processing consecutive files.",
               "enableCondition": [
@@ -232,6 +232,16 @@
               "defaultValue": true,
               "required": "false"
             }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.WorkerPoolSize",
+              "displayName": "Worker Pool Size",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "4"
+            }
           }
         ]
       }
@@ -250,9 +260,10 @@
               "inputType": "combo",
               "comboValues": [
                 "DELETE",
-                "MOVE"
+                "MOVE",
+                "NONE"
               ],
-              "defaultValue": "MOVE",
+              "defaultValue": "DELETE",
               "required": "false"
             }
           },
@@ -295,10 +306,22 @@
               "inputType": "combo",
               "comboValues": [
                 "DELETE",
-                "MOVE"
+                "MOVE",
+                "NONE"
               ],
-              "defaultValue": "MOVE",
+              "defaultValue": "DELETE",
               "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailOnErrorCode",
+              "displayName": "Fail On Error Code",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "When true, a file whose flow ends with the ERROR_CODE property takes the action after failure, also when the error sequence handled the fault. A flow that recovers from an error removes ERROR_CODE, else the file fails. A fault after a non blocking call is not seen, so a call whose fault must decide the file needs blocking true. A fault in a branch of a scatter gather, a foreach with a collection, an iterate, or a clone that runs its branches in parallel, is on a copy of the message and is not seen either. A flow that writes one file to several targets runs the writes on the message of the file, not on copies. When false, a fault that the error sequence handles leaves the file processed, as on the transport."
             }
           },
           {
@@ -338,8 +361,9 @@
               "name": "transport.vfs.FailedRecordsFileName",
               "displayName": "Failed Records File Name",
               "inputType": "string",
-              "defaultValue": "vfs-move-failed-records.properties",
-              "required": "false"
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Deprecated. Used for migration from older configurations."
             }
           },
           {
@@ -349,7 +373,8 @@
               "displayName": "Failed Records File Destination",
               "inputType": "string",
               "defaultValue": "",
-              "required": "false"
+              "required": "false",
+              "helpTip": "Deprecated. Used for migration from older configurations."
             }
           },
           {
@@ -358,8 +383,60 @@
               "name": "transport.vfs.MoveFailedRecordTimestampFormat",
               "displayName": "Move Failed Record Timestamp Format",
               "inputType": "string",
-              "defaultValue": "dd-MM-yyyy HH:mm:ss",
-              "required": "false"
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Deprecated. Used for migration from older configurations."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ReplyFileURI",
+              "displayName": "Reply File URI",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ReplyFileName",
+              "displayName": "Reply File Name",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "response.xml"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MaskHeaderPassword",
+              "displayName": "Mask Header Password",
+              "inputType": "checkbox",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "When true, the file address and the reply address in the transport headers show the password masked. By default they hold the password, as the transport does."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.Append",
+              "displayName": "Append",
+              "inputType": "checkbox",
+              "required": "false",
+              "defaultValue": false
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.CreateFolder",
+              "displayName": "Create Folder",
+              "inputType": "checkbox",
+              "required": "false",
+              "defaultValue": false
             }
           }
         ]
@@ -377,7 +454,7 @@
               "name": "transport.vfs.MaxRetryCount",
               "displayName": "Max Retry Count",
               "inputType": "string",
-              "defaultValue": "",
+              "defaultValue": "3",
               "required": "false"
             }
           },
@@ -387,8 +464,9 @@
               "name": "transport.vfs.ReconnectTimeout",
               "displayName": "Reconnect Timeout",
               "inputType": "string",
-              "defaultValue": "",
-              "required": "false"
+              "defaultValue": "30s",
+              "required": "false",
+              "helpTip": "The wait between two tries to reach the polled folder after a failure. A bare number below 1000 is in seconds, a bare number of 1000 or more is in milliseconds, and the suffix s or ms is taken as written."
             }
           },
           {
@@ -397,8 +475,9 @@
               "name": "transport.vfs.FailedRecordNextRetryDuration",
               "displayName": "Failed Record Next Retry Duration",
               "inputType": "string",
-              "defaultValue": "3000",
-              "required": "false"
+              "defaultValue": "30000",
+              "required": "false",
+              "helpTip": "The first wait before a failed post action is tried again, in milliseconds. It doubles at each try up to 30 minutes."
             }
           },
           {
@@ -421,7 +500,7 @@
               "name": "transport.vfs.AutoLockRelease",
               "displayName": "Auto Lock Release",
               "inputType": "checkbox",
-              "defaultValue": false,
+              "defaultValue": true,
               "required": "false",
               "enableCondition": [
                 {
@@ -436,8 +515,24 @@
               "name": "transport.vfs.AutoLockReleaseInterval",
               "displayName": "Auto Lock Release Interval",
               "inputType": "string",
-              "required": "true",
+              "required": "false",
               "defaultValue": "",
+              "enableCondition": [
+                {
+                  "transport.vfs.AutoLockRelease": true
+                }
+              ],
+              "helpTip": "Deprecated. Used for migration from older configurations."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.LockReleaseSameNode",
+              "displayName": "Auto Lock Release Same Node",
+              "inputType": "checkbox",
+              "defaultValue": true,
+              "required": "",
               "enableCondition": [
                 {
                   "transport.vfs.AutoLockRelease": true
@@ -448,16 +543,43 @@
           {
             "type": "attribute",
             "value": {
-              "name": "transport.vfs.LockReleaseSameNode",
-              "displayName": "Auto Lock Release Same Node",
-              "inputType": "checkbox",
-              "defaultValue": false,
-              "required": "",
-              "enableCondition": [
-                {
-                  "transport.vfs.AutoLockRelease": true
-                }
-              ]
+              "name": "transport.vfs.MaxReadTransportErrors",
+              "displayName": "Max Read Transport Errors",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "3"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.StopTimeout",
+              "displayName": "Stop Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "60s",
+              "helpTip": "The longest wait for the files in flight at undeploy, deactivate and handover. A bare number is in seconds. The suffix ms gives milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.LockStaleAge",
+              "displayName": "Lock Stale Age",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The age after which a lock counts as stale, in milliseconds. -1 means never. A value below 60000 is raised to 60000."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FailedRecordFlagAfterRetries",
+              "displayName": "Failed Record Flag After Retries",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "12"
             }
           }
         ]
@@ -494,9 +616,14 @@
             "value": {
               "name": "transport.vfs.SFTPUserDirIsRoot",
               "displayName": "SFTP User Directory Is Root",
-              "inputType": "checkbox",
-              "defaultValue": false,
-              "required": "false"
+              "inputType": "combo",
+              "defaultValue": "",
+              "required": "false",
+              "comboValues": [
+                "",
+                "true",
+                "false"
+              ]
             }
           },
           {
@@ -618,6 +745,403 @@
               "inputType": "checkbox",
               "defaultValue": true,
               "required": "false"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.waitTimeBeforeRead",
+              "displayName": "wait Time Before Read",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.IsMounted",
+              "displayName": "Is Mounted",
+              "inputType": "checkbox",
+              "required": "false",
+              "defaultValue": false
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.TempFolderName",
+              "displayName": "Temp Folder Name",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ".part"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.TempFileSuffix",
+              "displayName": "Temp File Suffix",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ".part"
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ResolveHostsDynamically",
+              "displayName": "Resolve Hosts Dynamically",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPSessionTimeout",
+              "displayName": "SFTPSession Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The SFTP session timeout, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPKeepAliveCount",
+              "displayName": "SFTPKeep Alive Count",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPConnectTimeout",
+              "displayName": "SFTPConnect Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The bound of the SFTP connect, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FTPConnectTimeout",
+              "displayName": "FTPConnect Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The bound of the FTP connect, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FTPSocketTimeout",
+              "displayName": "FTPSocket Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The read timeout of the FTP control connection, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.FTPDataTimeout",
+              "displayName": "FTPData Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The read timeout of an FTP data connection, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SMB2ReadTimeout",
+              "displayName": "SMB2Read Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The SMB2 read timeout, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SMB2WriteTimeout",
+              "displayName": "SMB2Write Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The SMB2 write timeout, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SMB2TransactTimeout",
+              "displayName": "SMB2Transact Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The SMB2 transact timeout, in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SMB2DfsEnabled",
+              "displayName": "SMB2 DFS Enabled",
+              "inputType": "checkbox",
+              "required": "false",
+              "defaultValue": true,
+              "helpTip": "When true, the SMB2 client resolves DFS paths. Set false for a server that does not use DFS."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.WriteStallTimeout",
+              "displayName": "Write Stall Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "The longest time a write may make no progress, in milliseconds. 0 turns the check off."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPKeyExchangeAlgorithms",
+              "displayName": "SFTPKey Exchange Algorithms",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPHostKeyAlgorithms",
+              "displayName": "SFTPHost Key Algorithms",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPCiphers",
+              "displayName": "SFTPCiphers",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPMacs",
+              "displayName": "SFTPMacs",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.SFTPPubkeyAcceptedAlgorithms",
+              "displayName": "SFTPPubkey Accepted Algorithms",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.passive",
+              "displayName": "vfs.passive",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.implicit",
+              "displayName": "vfs.implicit",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.protection",
+              "displayName": "vfs.protection",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.ssl.keystore",
+              "displayName": "vfs.ssl.keystore",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.ssl.truststore",
+              "displayName": "vfs.ssl.truststore",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.ssl.kspassword",
+              "displayName": "vfs.ssl.kspassword",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.ssl.tspassword",
+              "displayName": "vfs.ssl.tspassword",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.ssl.keypassword",
+              "displayName": "vfs.ssl.keypassword",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "filetype",
+              "displayName": "filetype",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.EncryptionEnabled",
+              "displayName": "vfs.Encryption Enabled",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "vfs.diskShareAccessMask",
+              "displayName": "vfs.disk Share Access Mask",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": ""
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.AvoidPermissionCheck",
+              "displayName": "Avoid Permission Check",
+              "inputType": "checkbox",
+              "required": "false",
+              "defaultValue": true
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ActionAfterErrors",
+              "displayName": "Action After Errors",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.MoveAfterErrors",
+              "displayName": "Move After Errors",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.DistributedLock",
+              "displayName": "Distributed Lock",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.DistributedTimeout",
+              "displayName": "Distributed Timeout",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transport.vfs.ClusterAware",
+              "displayName": "Cluster Aware",
+              "inputType": "string",
+              "required": "false",
+              "defaultValue": "",
+              "helpTip": "Deprecated. Ignored when set."
             }
           }
         ]

@@ -18,26 +18,16 @@
 
 package org.wso2.carbon.inbound.vfs.filter;
 
-import org.wso2.carbon.inbound.vfs.VFSConfig;
-import org.wso2.org.apache.commons.vfs2.FileObject;
+import java.util.regex.Pattern;
 
-import java.util.logging.Logger;
+public final class FileNameFilter {
+    private final Pattern pattern;
 
-/**
- * Filter to filter files based on file name pattern.
- */
-public class FileNameFilter implements Filter {
-    Logger logger = Logger.getLogger(FileNameFilter.class.getName());
-    VFSConfig vfsConfig;
-
-    public FileNameFilter(VFSConfig vfsConfig) {
-        this.vfsConfig = vfsConfig;
+    public FileNameFilter(String expression) {
+        pattern = expression == null || expression.isEmpty() ? null : Pattern.compile(expression);
     }
 
-    @Override
-    public boolean accept(FileObject fileObject) {
-        String fileNamePattern = vfsConfig.getFileNamePattern();
-        //todo: Regex support
-        return fileObject.getName().getBaseName().matches(fileNamePattern);
+    public boolean accept(String name) {
+        return pattern == null || pattern.matcher(name).matches();
     }
 }
