@@ -1187,6 +1187,9 @@ class FileTaskTest {
                 assertEquals(21, stream.read());
                 inside.countDown();
                 assertTrue(done.await(10, TimeUnit.SECONDS));
+                // The first read filled the buffer of the content with the whole file. The flow still gets the byte
+                // in the buffer, and the next read below the buffer fails.
+                assertEquals(22, stream.read());
                 readFailure.set(assertThrows(java.io.IOException.class, stream::read));
             }
             return true;

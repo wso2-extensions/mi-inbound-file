@@ -52,6 +52,7 @@ import org.wso2.vfs.shared.failstate.FileIdentity;
 
 import javax.mail.internet.ContentType;
 import javax.mail.internet.ParseException;
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -126,7 +127,9 @@ public class FileInjectHandler {
                         store.digesting(input, identity, generation::progress), generation, threshold,
                         count -> session.contentBarrier(file.getFileSystem(), count));
                 opened.add(stream);
-                return stream;
+                // A builder that reads in small steps takes them from this buffer, so the streams below read in
+                // blocks of 8 KiB. The buffer also lets a builder mark and reset the content.
+                return new BufferedInputStream(stream, 8192);
             } catch (IOException error) {
                 openFailure = error;
                 openMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);

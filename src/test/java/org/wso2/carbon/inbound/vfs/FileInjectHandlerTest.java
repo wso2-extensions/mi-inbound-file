@@ -80,11 +80,15 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 
@@ -94,6 +98,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.same;
@@ -409,6 +414,106 @@ class FileInjectHandlerTest {
         assertEquals(namespace, injected.get(0).getNamespace().getNamespaceURI());
     }
 
+    // A builder that marks the content, reads its start and resets it, then reads the content to its end. It gets the
+    // whole file after the reset, and the hash in the identity is the hash of the whole file.
+    @Test
+    void aBuilderThatMarksAndResetsGetsTheWholeFileAndItsHash() throws Exception {
+        byte[] payload = new byte[20000];
+        new Random(5).nextBytes(payload);
+        Path path = Files.write(folder.resolve("m.dat"), payload);
+        FileObject file = VFS.getManager().resolveFile(path.toUri().toString());
+        FileIdentity identity = new FileIdentity(file.getName().getURI(), payload.length,
+                Files.getLastModifiedTime(path).toMillis(), FileIdentity.TimeSource.LISTING, null);
+        StepBuilder builder = new StepBuilder(100);
+        try {
+            assertTrue(read(file, identity, mock(Generation.class), builder), String.valueOf(builder.failure));
+        } finally {
+            file.close();
+        }
+        assertArrayEquals(payload, builder.content.toByteArray());
+        StringBuilder hash = new StringBuilder();
+        for (byte value : MessageDigest.getInstance("SHA-256").digest(payload)) {
+            hash.append(String.format("%02x", value));
+        }
+        assertEquals(hash.toString(), identity.digest());
+    }
+
+    // The relay builder of the pack reads the content in steps of 1 KiB. The steps come from a buffer of 8 KiB above
+    // the record and digest streams. So the provider stream, and every stream above it up to the buffer, sees one read
+    // of 8 KiB for each 8 KiB of the file and one more read at its end. The progress of the read is marked once for
+    // each 8 KiB.
+    @Test
+    void stepsOf1KiBReachTheProviderStreamAsReadsOf8KiB() throws Exception {
+        byte[] payload = new byte[64 * 1024];
+        new Random(7).nextBytes(payload);
+        List<Integer> reads = new ArrayList<>();
+        FileName name = VFS.getManager().resolveURI("sftp://user:secret@host/in/s.dat");
+        FileObject file = mock(FileObject.class);
+        FileContent content = mock(FileContent.class);
+        when(file.getName()).thenReturn(name);
+        when(file.getContent()).thenReturn(content);
+        when(content.getInputStream()).thenReturn(new ByteArrayInputStream(payload) {
+            @Override
+            public synchronized int read() {
+                reads.add(1);
+                return super.read();
+            }
+
+            @Override
+            public synchronized int read(byte[] bytes, int offset, int length) {
+                reads.add(length);
+                return super.read(bytes, offset, length);
+            }
+        });
+        FileIdentity identity = new FileIdentity(name.getURI(), payload.length, 0, FileIdentity.TimeSource.LISTING,
+                null);
+        Generation generation = mock(Generation.class);
+        StepBuilder builder = new StepBuilder(0);
+        assertTrue(read(file, identity, generation, builder), String.valueOf(builder.failure));
+        assertArrayEquals(payload, builder.content.toByteArray());
+        assertEquals(payload.length / 8192 + 1, reads.size());
+        assertEquals(Collections.singleton(8192), new HashSet<>(reads));
+        verify(generation, times(payload.length / 8192)).progress(anyLong());
+        verify(generation, times(payload.length / 8192)).progress(8192);
+    }
+
+    // Mediates one file under application/octet-stream with the given builder. The content is read through the real
+    // digest and record streams.
+    private boolean read(FileObject file, FileIdentity identity, Generation generation, Builder builder)
+            throws Exception {
+        Properties properties = new Properties();
+        properties.setProperty(VFSConstants.TRANSPORT_FILE_FILE_URI, folder.toUri().toString());
+        properties.setProperty(VFSConstants.TRANSPORT_FILE_CONTENT_TYPE, "application/octet-stream");
+        SynapseConfiguration configuration = mock(SynapseConfiguration.class);
+        SynapseEnvironment environment = mock(SynapseEnvironment.class);
+        SequenceMediator sequence = mock(SequenceMediator.class);
+        when(environment.getSynapseConfiguration()).thenReturn(configuration);
+        when(sequence.isInitialized()).thenReturn(true);
+        InboundEndpoint inbound = mock(InboundEndpoint.class);
+        when(inbound.getArtifactContainerName()).thenReturn(ENDPOINT);
+        when(configuration.getInboundEndpoint(ENDPOINT)).thenReturn(inbound);
+        AxisConfiguration axis = new AxisConfiguration();
+        axis.addMessageBuilder("application/octet-stream", builder);
+        ConfigurationContext context = new ConfigurationContext(axis);
+        when(environment.createMessageContext()).thenAnswer(call -> {
+            MessageContext message = new MessageContext();
+            message.setConfigurationContext(context);
+            return new Axis2MessageContext(message, configuration, environment);
+        });
+        when(environment.injectInbound(any(), same(sequence), eq(true))).thenReturn(true);
+        FailStateStore store = mock(FailStateStore.class);
+        when(store.digesting(any(), any(), any())).thenAnswer(call ->
+                new DigestingInputStream(call.getArgument(0), call.getArgument(1), call.getArgument(2)));
+        NamedLog log = NamedLog.inbound(LogFactory.getLog(FileInjectHandlerTest.class), ENDPOINT, new RepeatLimiter());
+        FileInjectHandler handler = new FileInjectHandler("process", null, environment, new VFSConfig(properties));
+        try (FileInjectHandler.Content content = new FileInjectHandler.Content(file, identity, store, generation,
+                mock(VfsSession.class), ENDPOINT, mock(ReplySender.class), log)) {
+            boolean result = handler.invoke(sequence, ENDPOINT, new HashMap<>(), content);
+            assertNull(content.readFailure());
+            return result;
+        }
+    }
+
     // A fault that the error sequence handles leaves the file processed, as on the transport listener. The file fails
     // only when the flow leaves an error code in the transport headers. An empty text there is no error code, and a
     // value that is not a text fails the file, as it failed the file on the transport with an exception. The flow and
@@ -721,6 +826,44 @@ class FileInjectHandlerTest {
             envelope.getBody().addChild(factory.createOMElement("binary",
                     factory.createOMNamespace("http://ws.apache.org/commons/ns/payload", "ns")));
             return envelope;
+        }
+    }
+
+    // Reads the content in steps of 1 KiB and keeps it, as the relay builder of the pack does when the body is kept
+    // (BinaryRelayBuilder.readAllFromInputSteam). With a peek it first marks the content, reads that many bytes one by
+    // one and resets the content to its start, as a builder that looks at the start of the content does.
+    private static final class StepBuilder implements Builder {
+        private final int peek;
+        private final ByteArrayOutputStream content = new ByteArrayOutputStream();
+        private IOException failure;
+
+        StepBuilder(int peek) {
+            this.peek = peek;
+        }
+
+        @Override
+        public OMElement processDocument(InputStream input, String type, MessageContext message) throws AxisFault {
+            try {
+                if (peek > 0) {
+                    if (!input.markSupported()) {
+                        throw new IOException("The content stream does not support mark.");
+                    }
+                    input.mark(peek);
+                    for (int i = 0; i < peek; i++) {
+                        input.read();
+                    }
+                    input.reset();
+                }
+                byte[] step = new byte[1024];
+                int size;
+                while ((size = input.read(step)) != -1) {
+                    content.write(step, 0, size);
+                }
+            } catch (IOException error) {
+                failure = error;
+                throw AxisFault.makeFault(error);
+            }
+            return OMAbstractFactory.getSOAP11Factory().getDefaultEnvelope();
         }
     }
 }
